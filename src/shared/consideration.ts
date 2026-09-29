@@ -1,3 +1,29 @@
+/** Where someone is in being called, released or passed over, in order */
+export const STATUSES = [
+  'Submitted by Presidency',
+  'Discussion',
+  'Pray about',
+  'Schedule for Interview',
+  'Submit to Stake',
+  'Contacted for Interview',
+  'Submitted to Stake',
+  'Interview Scheduled',
+  'Called and accepted',
+  'Ready to sustain',
+  'Sustained',
+  'Need to release',
+  'Thank at pulpit',
+  'Released',
+  'Declined',
+  'Not extended',
+  'Member Considering',
+  'Stake Considering',
+] as const
+
+export type Status = typeof STATUSES[number]
+
+export const isStatus = (value: unknown): value is Status => STATUSES.includes(value as Status)
+
 /** Someone being considered for a calling */
 export interface Candidate {
   /**
@@ -7,6 +33,8 @@ export interface Candidate {
    */
   id: string
   notes: string
+  /** left out until one is picked */
+  status?: Status
 }
 
 /** Who is being considered for one calling row on the Organizations page */

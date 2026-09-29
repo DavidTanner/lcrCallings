@@ -19,8 +19,8 @@ function fakeGoogle({ tabs = [SHEET_TITLE], rows = [HEADER] as string[][], statu
     if (forced) return reply({ error: { message: `status ${String(forced)}` } }, forced)
     if (url.endsWith('?fields=sheets.properties.title')) return reply({ sheets: tabs.map(title => ({ properties: { title } })) })
     if (url.includes(`${RANGE}A%3AA`)) return reply({ values: rows.map(([key = '']) => [key]) })
-    if (url.includes(`${RANGE}A1%3AG1`)) return reply({ values: rows.slice(0, 1) })
-    if (url.includes(`${RANGE}A2%3AG`)) return reply({ values: rows.slice(1) })
+    if (url.includes(`${RANGE}A1%3AH1`)) return reply({ values: rows.slice(0, 1) })
+    if (url.includes(`${RANGE}A2%3AH`)) return reply({ values: rows.slice(1) })
     return reply({})
   }
   return { calls, fetchFn: fetchFn }
@@ -41,7 +41,7 @@ const consideration = {
   member: 'p1',
   candidates: [
     { id: 'm1', notes: 'Available after June' },
-    { id: 'm2', notes: '' },
+    { id: 'm2', notes: '', status: 'Pray about' as const },
   ],
 }
 
@@ -64,6 +64,11 @@ describe('createSheetsClient', () => {
 
   it('ignores names in Data saved before they were dropped', () => {
     assert.deepEqual(candidatesIn(['k', 'Bishop', '', '', '', '', '[{"id":"m1","name":"A","notes":"N"},{"id":2}]']), [{ id: 'm1', notes: 'N' }])
+  })
+
+  it('ignores statuses in Data that are not on the list', () => {
+    const data = '[{"id":"m1","notes":"","status":"Sustained"},{"id":"m2","notes":"","status":"Maybe"}]'
+    assert.deepEqual(candidatesIn(['k', 'Bishop', '', '', '', '', data]), [{ id: 'm1', notes: '', status: 'Sustained' }, { id: 'm2', notes: '' }])
   })
 
   it('updates an old header', async () => {
@@ -96,9 +101,9 @@ describe('createSheetsClient', () => {
     await createSheetsClient(tokens(), google.fetchFn).save(ID, consideration)
     const write = google.calls.at(-1)
     assert.equal(write?.method, 'PUT')
-    assert.match(write.url, new RegExp(`^${ID}/values/${RANGE}A3%3AG3\\?valueInputOption=RAW$`))
-    const [key, calling, member, considering, , notes, data] = (write.body as { values: string[][] }).values[0] ?? []
-    assert.deepEqual([key, calling, member, considering, notes], ['Bishop|p1|0', 'Bishop', 'p1', 'm1\nm2', 'm1: Available after June'])
+    assert.match(write.url, new RegExp(`^${ID}/values/${RANGE}A3%3AH3\\?valueInputOption=RAW$`))
+    const [key, calling, member, considering, , notes, data, status] = (write.body as { values: string[][] }).values[0] ?? []
+    assert.deepEqual([key, calling, member, considering, notes, status], ['Bishop|p1|0', 'Bishop', 'p1', 'm1\nm2', 'm1: Available after June', 'm2: Pray about'])
     assert.deepEqual(JSON.parse(data ?? ''), consideration.candidates)
   })
 
@@ -107,7 +112,7 @@ describe('createSheetsClient', () => {
     await createSheetsClient(tokens(), google.fetchFn).save(ID, consideration)
     const write = google.calls.at(-1)
     assert.equal(write?.method, 'POST')
-    assert.match(write.url, /A%3AG:append\?valueInputOption=RAW&insertDataOption=INSERT_ROWS$/)
+    assert.match(write.url, /A%3AH:append\?valueInputOption=RAW&insertDataOption=INSERT_ROWS$/)
   })
 
   it('retries once with a fresh token when Google rejects one', async () => {

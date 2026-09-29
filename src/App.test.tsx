@@ -15,6 +15,7 @@ const cell = (calling: string) => [...document.querySelectorAll(`[${SLOT}]`)]
   .find(slot => slot.getAttribute(SLOT)?.startsWith(`${calling}|`))?.shadowRoot?.lastElementChild as HTMLElement | null | undefined
 const input = (calling: string) => cell(calling)?.querySelector<HTMLInputElement>(`input[aria-label="Considering for ${calling}"]`)
 const notes = (calling: string, name: string) => cell(calling)?.querySelector<HTMLTextAreaElement>(`textarea[aria-label="Notes on ${name} for ${calling}"]`)
+const status = (calling: string, name: string) => cell(calling)?.querySelector<HTMLInputElement>(`input[aria-label="Status of ${name} for ${calling}"]`)
 const picked = (calling: string) => [...cell(calling)?.querySelectorAll('.mantine-Pill-label') ?? []].map(pill => pill.textContent)
 async function pick(calling: string, name: string) {
   const field = input(calling)
@@ -63,10 +64,11 @@ describe('App', () => {
   })
 
   it('reconnects to the saved sheet and shows its candidates and notes', async () => {
-    renderApp(fakeApi({ spreadsheetId: SHEET_ID, sheet: { 'Ward Clerk|vacant|0': [{ id: 'm1', notes: 'Good with numbers' }] } }))
+    renderApp(fakeApi({ spreadsheetId: SHEET_ID, sheet: { 'Ward Clerk|vacant|0': [{ id: 'm1', notes: 'Good with numbers', status: 'Pray about' }] } }))
     await screen.findByText(/Tracking 2 callings/)
     assert.deepEqual(picked('Ward Clerk'), ['Abel, Bea'])
     assert.equal(notes('Ward Clerk', 'Abel, Bea')?.value, 'Good with numbers')
+    assert.equal(status('Ward Clerk', 'Abel, Bea')?.value, 'Pray about')
     assert.deepEqual(picked('Bishop'), [])
     assert.equal(screen.getByRole('link', { name: 'the shared sheet' }).getAttribute('href'), `https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit`)
   })
@@ -138,6 +140,32 @@ describe('App', () => {
     finally {
       mock.timers.reset()
     }
+  })
+
+  it('saves a candidate\'s status right away, and clears it', async () => {
+    const api = fakeApi({ spreadsheetId: SHEET_ID, sheet: { 'Bishop|p1|0': [{ id: 'm1', notes: 'Ask' }] } })
+    renderApp(api)
+    await screen.findByText(/Tracking/)
+    const field = status('Bishop', 'Abel, Bea')
+    const container = cell('Bishop')
+    assert.ok(field && container)
+    assert.equal(field.value, '')
+    fireEvent.click(field)
+    const option = await within(container).findByRole('option', { name: 'Schedule for Interview' })
+    await act(async () => {
+      fireEvent.click(option)
+      await Promise.resolve()
+    })
+    assert.deepEqual(api.saved.at(-1)?.candidates, [{ id: 'm1', notes: 'Ask', status: 'Schedule for Interview' }])
+    assert.equal(field.value, 'Schedule for Interview')
+
+    const clear = container.querySelector<HTMLButtonElement>('.mantine-InputClearButton-root')
+    assert.ok(clear)
+    await act(async () => {
+      fireEvent.click(clear)
+      await Promise.resolve()
+    })
+    assert.deepEqual(api.saved.at(-1)?.candidates, [{ id: 'm1', notes: 'Ask' }])
   })
 
   it('reports save failures', async () => {

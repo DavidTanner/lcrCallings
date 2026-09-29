@@ -1,15 +1,15 @@
-import type { Candidate, Consideration } from '../shared/consideration'
+import { type Candidate, type Consideration, isStatus } from '../shared/consideration'
 
 /** Title of the tab the extension keeps its rows in */
 export const SHEET_TITLE = 'Considering'
 /**
  * Members are recorded by their LCR member uuid, never by name, since members
- * can share a name. Considering and Notes are for people reading the sheet;
- * the extension reads candidates back from Data. Rows saved before Data
+ * can share a name. Considering, Notes and Status are for people reading the
+ * sheet; the extension reads candidates back from Data. Rows saved before Data
  * existed only have Considering, as free text.
  */
-export const HEADER = ['Key', 'Calling', 'Held by', 'Considering', 'Updated', 'Notes', 'Data']
-const LAST_COLUMN = 'G'
+export const HEADER = ['Key', 'Calling', 'Held by', 'Considering', 'Updated', 'Notes', 'Data', 'Status']
+const LAST_COLUMN = 'H'
 
 const API = 'https://sheets.googleapis.com/v4/spreadsheets'
 
@@ -56,6 +56,7 @@ export function createSheetsClient(tokens: TokenProvider, fetchFn: (url: string,
     new Date().toISOString(),
     candidates.filter(c => c.notes).map(c => `${c.id}: ${c.notes}`).join('\n'),
     candidates.length ? JSON.stringify(candidates) : '',
+    candidates.filter(c => c.status).map(c => `${c.id}: ${c.status ?? ''}`).join('\n'),
   ]
   const writeHeader = (id: string) =>
     request(`${range(id, 'A1')}?valueInputOption=RAW`, { method: 'PUT', body: JSON.stringify({ values: [HEADER] }) })
@@ -143,9 +144,9 @@ export function candidatesIn([, , , considering = '', , , data = '']: string[]):
 /** Rows saved before names were dropped also have a name in Data, which is ignored */
 function toCandidate(value: unknown): Candidate[] {
   if (typeof value !== 'object' || value === null) return []
-  const { id, notes } = value as Partial<Record<keyof Candidate, unknown>>
+  const { id, notes, status } = value as Partial<Record<keyof Candidate, unknown>>
   if (typeof id !== 'string') return []
-  return [{ id, notes: typeof notes === 'string' ? notes : '' }]
+  return [{ id, notes: typeof notes === 'string' ? notes : '', ...(isStatus(status) ? { status } : {}) }]
 }
 
 export type SheetsClient = ReturnType<typeof createSheetsClient>

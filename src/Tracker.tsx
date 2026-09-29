@@ -1,4 +1,4 @@
-import { Anchor, Button, type ComboboxItem, Group, MultiSelect, Stack, Text, Textarea } from '@mantine/core'
+import { Anchor, Button, type ComboboxItem, Group, MultiSelect, Select, Stack, Text, Textarea } from '@mantine/core'
 import mantineCss from '@mantine/core/styles.css'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -7,7 +7,7 @@ import type { ExtensionApi } from './content/api'
 import type { Member } from './lcr/members'
 import { type CallingRow, COLUMN_TITLE, enhancePage } from './page/enhance'
 import { shadowContainer } from './shadow'
-import type { Candidate } from './shared/consideration'
+import { type Candidate, isStatus, STATUSES } from './shared/consideration'
 import { spreadsheetUrl } from './shared/spreadsheet'
 
 /** How long typing in notes pauses before they're saved */
@@ -247,7 +247,9 @@ interface CandidatesFieldProps {
   onDone: (key: string) => void
 }
 
-/** Picks who is being considered for one calling, with notes on each */
+const STATUS_OPTIONS = [...STATUSES]
+
+/** Picks who is being considered for one calling, with a status and notes on each */
 const CandidatesField = memo(function CandidatesField({ row, candidates, options, names, loading, membersError, dropdownTarget, onChange, onDone }: CandidatesFieldProps) {
   const nameOf = (id: string) => candidateName(id, names, loading)
 
@@ -264,6 +266,11 @@ const CandidatesField = memo(function CandidatesField({ row, candidates, options
 
   const setNotes = (id: string, notes: string) => {
     onChange(row, candidates.map(c => c.id === id ? { ...c, notes } : c), true)
+  }
+
+  /** clearing the status leaves it out, as it is before one is picked */
+  const setStatus = (id: string, value: string | null) => {
+    onChange(row, candidates.map(c => c.id !== id ? c : isStatus(value) ? { ...c, status: value } : { id: c.id, notes: c.notes }), false)
   }
 
   return (
@@ -283,23 +290,36 @@ const CandidatesField = memo(function CandidatesField({ row, candidates, options
         comboboxProps={{ keepMounted: false, portalProps: { target: dropdownTarget } }}
       />
       {candidates.map(c => (
-        <Textarea
-          key={c.id}
-          size="xs"
-          label={nameOf(c.id)}
-          aria-label={`Notes on ${nameOf(c.id)} for ${row.calling}`}
-          placeholder="Notes"
-          autosize
-          minRows={1}
-          maxRows={6}
-          value={c.notes}
-          onChange={(event) => {
-            setNotes(c.id, event.currentTarget.value)
-          }}
-          onBlur={() => {
-            onDone(row.key)
-          }}
-        />
+        <Stack key={c.id} gap={2}>
+          <Select
+            size="xs"
+            label={nameOf(c.id)}
+            aria-label={`Status of ${nameOf(c.id)} for ${row.calling}`}
+            placeholder="Status"
+            data={STATUS_OPTIONS}
+            value={c.status ?? null}
+            onChange={(value) => {
+              setStatus(c.id, value)
+            }}
+            clearable
+            comboboxProps={{ keepMounted: false, portalProps: { target: dropdownTarget } }}
+          />
+          <Textarea
+            size="xs"
+            aria-label={`Notes on ${nameOf(c.id)} for ${row.calling}`}
+            placeholder="Notes"
+            autosize
+            minRows={1}
+            maxRows={6}
+            value={c.notes}
+            onChange={(event) => {
+              setNotes(c.id, event.currentTarget.value)
+            }}
+            onBlur={() => {
+              onDone(row.key)
+            }}
+          />
+        </Stack>
       ))}
     </Stack>
   )

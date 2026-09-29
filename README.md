@@ -12,19 +12,21 @@ Built with React, Mantine, TypeScript 6 and esbuild.
 1. Open the Organizations page in LCR and click the extension's toolbar button.
 2. The first time, paste the link to a Google Sheet shared with everyone who
    should see the column, and approve Google sign-in.
-3. In the **Considering** column, pick members for each calling, and add notes
-   on each one in the box that appears under them. Picks save right away,
-   notes after a second's pause or when you leave the box; **Refresh** pulls
-   in changes others made.
+3. In the **Considering** column, pick members for each calling, then set
+   each one's status (Submitted by Presidency, Discussion, … Sustained,
+   Released, …) and add notes in the fields that appear under them. Picks and
+   statuses save right away, notes after a second's pause or when you leave
+   the box; **Refresh** pulls in changes others made.
 
 Members come from LCR's Member List page (`/mlt/records/member-list`),
 fetched with your LCR session.
 
 The extension keeps its rows in a `Considering` tab it adds to the sheet:
-`Key | Calling | Held by | Considering | Updated | Notes | Data`. Members are
+`Key | Calling | Held by | Considering | Updated | Notes | Data | Status`. Members are
 recorded by their LCR member id (uuid), never by name, since members can share
 a name: Held by is the current holder's id, Considering lists each candidate's
-id, Notes are `<id>: <notes>`, and Data (JSON) is `[{"id": …, "notes": …}]`.
+id, Notes are `<id>: <notes>`, Status is `<id>: <status>`, and Data (JSON) is
+`[{"id": …, "notes": …, "status": …}]` (status is left out until one is set).
 The extension shows names from LCR's member list; anyone no longer in it shows
 by their id. The key identifies the row by calling, current holder's member id
 and occurrence, so an entry stops showing once the calling changes hands. The
