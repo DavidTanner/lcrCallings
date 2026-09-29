@@ -141,3 +141,10 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+dist/
+# saved LCR pages and API responses contain member data
+resources/
+.idea/
+.claude
+.DS_Store
