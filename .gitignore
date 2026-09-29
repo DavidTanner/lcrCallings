@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.env
+# saved LCR pages and API responses contain member data
+resources/
+.idea/
+.claude

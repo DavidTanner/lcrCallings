@@ -1,0 +1,109 @@
+# Callings
+
+A Chrome extension (Manifest V3) for the Organizations page in Leader and
+Clerk Resources. It adds a **Considering** column after **Name** to track who
+is being considered for each calling, saved to a Google Sheet shared by
+everyone who uses it.
+
+Built with React, Mantine, TypeScript 6 and esbuild.
+
+## Using it
+
+1. Open the Organizations page in LCR and click the extension's toolbar button.
+2. The first time, paste the link to a Google Sheet shared with everyone who
+   should see the column, and approve Google sign-in.
+3. In the **Considering** column, pick members for each calling, and add notes
+   on each one in the box that appears under them. Picks save right away,
+   notes after a second's pause or when you leave the box; **Refresh** pulls
+   in changes others made.
+
+Members come from LCR's Member List page (`/mlt/records/member-list`),
+fetched with your LCR session.
+
+The extension keeps its rows in a `Considering` tab it adds to the sheet:
+`Key | Calling | Held by | Considering | Updated | Notes | Data`. Members are
+recorded by their LCR member id (uuid), never by name, since members can share
+a name: Held by is the current holder's id, Considering lists each candidate's
+id, Notes are `<id>: <notes>`, and Data (JSON) is `[{"id": …, "notes": …}]`.
+The extension shows names from LCR's member list; anyone no longer in it shows
+by their id. The key identifies the row by calling, current holder's member id
+and occurrence, so an entry stops showing once the calling changes hands. The
+extension reads candidates back from Data, so edits made in the sheet itself
+should go there. Rows from before candidates were picked from the member list
+show their Considering text as a candidate.
+
+It also adds `callings-row` and `callings-calling-<calling>` classes to every
+row (e.g. `callings-calling-elders-quorum-teacher`), so callings can be hidden
+with CSS. Clicking the toolbar button again, or the ×, removes everything it
+added to the page.
+
+## Setup
+
+Google only issues tokens to an OAuth client tied to the extension's id, so:
+
+1. `npm run keygen` adds `EXTENSION_KEY` to `.env` (git-ignored) and prints
+   the extension id. The key keeps the id the same wherever it's loaded.
+2. In [Google Cloud Console](https://console.cloud.google.com/), in a project:
+   - enable the **Google Sheets API**
+   - configure the **OAuth consent screen** (External, Testing) and add each
+     user's Google account as a test user. Tokens for apps in Testing expire
+     after 7 days, so users will occasionally re-approve.
+   - create an **OAuth client ID** of type **Chrome Extension** with the id
+     from step 1
+3. Add the client id to `.env` as `OAUTH_CLIENT_ID=….apps.googleusercontent.com`.
+4. `npm run build`, then in `chrome://extensions` turn on Developer mode,
+   **Load unpacked**, and pick `dist/`.
+
+Chrome must be signed in to the Google account that has access to the sheet.
+
+To share it, send others the built `dist/` folder to load unpacked, or publish
+it to the Chrome Web Store as unlisted (upload a zip of `dist/`; the store
+assigns its own id, so add that id to the OAuth client too).
+
+## Scripts
+
+| Command             | What it does                                                             |
+| ------------------- | ------------------------------------------------------------------------ |
+| `npm run build`     | Builds the extension into `dist/`                                        |
+| `npm run dev`       | Rebuilds `dist/` on change (reload the extension in `chrome://extensions` to pick it up). If `resources/existingCallingsPage.html` exists it's served at http://127.0.0.1:8000/demo.html, where the dev build also runs, and `resources/mltRecordsMemberList.txt` answers its member list requests |
+| `npm run keygen`    | Adds a key pinning the extension id to `.env`                            |
+| `npm run members -- [file]` | Prints the members in a saved LCR page payload as JSON (default `resources/mltRecordsMemberList.txt`) |
+| `npm test`          | Runs `node:test` over `src/**/*.test.{ts,tsx}` and `scripts/**/*.test.ts` |
+| `npm run lint`      | ESLint (typescript-eslint strict + `@stylistic`, no semicolons)           |
+| `npm run typecheck` | `tsc`                                                                     |
+| `npm run check`     | Typecheck, lint and test                                                  |
+
+## How it works
+
+- `src/background/` is the service worker. It opens and closes the panel when
+  the toolbar button is clicked, and talks to the Sheets API (`sheets.ts`)
+  with tokens from `chrome.identity`. Requests from here aren't subject to
+  LCR's Content Security Policy, which blocks connections to Google.
+- `src/content/` is the content script. It mounts the panel and asks the
+  background to load and save through `api.ts`, which is the only part that
+  touches Chrome APIs; tests use a fake instead.
+- `src/App.tsx` is the panel: pick a sheet, connect, then show sync status.
+- `src/Tracker.tsx` renders a `MultiSelect` and notes into each row's cell
+  through React portals, and saves changes. Each cell is its own shadow root
+  (`src/shadow.ts`) so LCR's CSS and Mantine's stay apart; dropdowns render
+  into a layer over the page so tables can't clip them.
+- `src/mount.tsx` renders the panel into a shadow root so page CSS and Mantine
+  CSS stay isolated. Mantine's stylesheet is imported as text (esbuild `text`
+  loader) and shared by every shadow root; the panel's Mantine portals render
+  in its root too.
+- `src/page/enhance.ts` adds the column, an empty slot in each row for the
+  field, and classes (finding columns by the label LCR repeats in each cell
+  for its mobile card view) and re-applies them when LCR re-renders.
+- `src/lcr/members.ts` parses the React Server Components payload LCR's
+  `/mlt` pages send (`parseFlight`) and extracts the unique members in it
+  (`parseMembers`).
+- `src/lcr/memberList.ts` gets everyone in the unit from LCR's Member List
+  page (`fetchMemberList`), asking for its payload with the `RSC` header, or
+  pulling it out of the page's HTML (`flightFromHtml`) if that's what comes
+  back. It needs the LCR session cookie, so it runs in the content script.
+- `scripts/manifest.ts` generates `manifest.json` from `package.json` and
+  `.env`.
+- `resources/` holds saved LCR pages for development. They contain member
+  data, so the folder is git-ignored.
+- Tests run in jsdom via `test/setup.ts`, which also teaches Node to import
+  `.css` files as text the same way esbuild does.

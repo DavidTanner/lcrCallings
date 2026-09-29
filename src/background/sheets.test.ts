@@ -1,0 +1,124 @@
+import assert from 'node:assert/strict'
+import { describe, it } from 'node:test'
+import { candidatesIn, createSheetsClient, HEADER, SHEET_TITLE, type TokenProvider } from './sheets'
+
+const ID = 'sheet1'
+const RANGE = encodeURIComponent(`'${SHEET_TITLE}'!`)
+
+interface Call { method: string, url: string, body?: unknown }
+
+/** A fetch that answers from a pretend spreadsheet and records every call */
+function fakeGoogle({ tabs = [SHEET_TITLE], rows = [HEADER] as string[][], status }: { tabs?: string[], rows?: string[][], status?: number[] } = {}) {
+  const calls: Call[] = []
+  const fetchFn = (input: string, init: RequestInit = {}) => {
+    const url = input.replace('https://sheets.googleapis.com/v4/spreadsheets/', '')
+    const method = init.method ?? 'GET'
+    calls.push({ method, url, ...(typeof init.body === 'string' ? { body: JSON.parse(init.body) as unknown } : {}) })
+    const reply = (body: unknown, code = 200) => Promise.resolve(new Response(JSON.stringify(body), { status: code }))
+    const forced = status?.shift()
+    if (forced) return reply({ error: { message: `status ${String(forced)}` } }, forced)
+    if (url.endsWith('?fields=sheets.properties.title')) return reply({ sheets: tabs.map(title => ({ properties: { title } })) })
+    if (url.includes(`${RANGE}A%3AA`)) return reply({ values: rows.map(([key = '']) => [key]) })
+    if (url.includes(`${RANGE}A1%3AG1`)) return reply({ values: rows.slice(0, 1) })
+    if (url.includes(`${RANGE}A2%3AG`)) return reply({ values: rows.slice(1) })
+    return reply({})
+  }
+  return { calls, fetchFn: fetchFn }
+}
+
+const tokens = (): TokenProvider & { invalidated: string[] } => {
+  let n = 0
+  const invalidated: string[] = []
+  return { invalidated, get: () => Promise.resolve(`token${String(++n)}`), invalidate: (t) => {
+    invalidated.push(t)
+    return Promise.resolve()
+  } }
+}
+
+const consideration = {
+  key: 'Bishop|p1|0',
+  calling: 'Bishop',
+  member: 'p1',
+  candidates: [
+    { id: 'm1', notes: 'Available after June' },
+    { id: 'm2', notes: '' },
+  ],
+}
+
+describe('createSheetsClient', () => {
+  it('loads candidates by key', async () => {
+    const data = JSON.stringify(consideration.candidates)
+    const google = fakeGoogle({ rows: [HEADER, ['a', 'Bishop', '', 'X', '', '', data], ['b', 'Clerk'], ['c', 'Clerk', '', 'Y'], ['a', 'Bishop', '', 'Z', '', '', '[]']] })
+    const values = await createSheetsClient(tokens(), google.fetchFn).load(ID)
+    assert.deepEqual(values, { a: [], b: [], c: [{ id: 'text:Y', notes: '' }] })
+  })
+
+  it('reads candidates from Data, or else the member ids or free text in Considering', () => {
+    const data = JSON.stringify(consideration.candidates)
+    const uuids = ['f0488c41-072f-4e4f-9b61-4d915df4d31b', '04d270ec-5e5b-4f3b-b414-5c12a11cd1a1']
+    assert.deepEqual(candidatesIn(['k', 'Bishop', '', 'ignored', '', '', data]), consideration.candidates)
+    assert.deepEqual(candidatesIn(['k', 'Bishop', '', ` ${uuids.join('\n')}\n`]), uuids.map(id => ({ id, notes: '' })))
+    assert.deepEqual(candidatesIn(['k', 'Bishop', '', ' Brother Jones ']), [{ id: 'text:Brother Jones', notes: '' }])
+    assert.deepEqual(candidatesIn(['k', 'Bishop', '', 'Typed', '', '', 'not json']), [{ id: 'text:Typed', notes: '' }])
+  })
+
+  it('ignores names in Data saved before they were dropped', () => {
+    assert.deepEqual(candidatesIn(['k', 'Bishop', '', '', '', '', '[{"id":"m1","name":"A","notes":"N"},{"id":2}]']), [{ id: 'm1', notes: 'N' }])
+  })
+
+  it('updates an old header', async () => {
+    const google = fakeGoogle({ rows: [HEADER.slice(0, 5)] })
+    await createSheetsClient(tokens(), google.fetchFn).load(ID)
+    const write = google.calls.find(c => c.method === 'PUT')
+    assert.deepEqual(write?.body, { values: [HEADER] })
+  })
+
+  it('checks the tab once per spreadsheet', async () => {
+    const google = fakeGoogle()
+    const client = createSheetsClient(tokens(), google.fetchFn)
+    await client.load(ID)
+    await client.load(ID)
+    assert.equal(google.calls.filter(c => c.url.endsWith('?fields=sheets.properties.title')).length, 1)
+    assert.equal(google.calls.filter(c => c.method === 'PUT').length, 0)
+  })
+
+  it('creates the tab with a header row when it is missing', async () => {
+    const google = fakeGoogle({ tabs: ['Sheet1'] })
+    await createSheetsClient(tokens(), google.fetchFn).load(ID)
+    const [, addSheet, header] = google.calls
+    assert.deepEqual(addSheet?.body, { requests: [{ addSheet: { properties: { title: SHEET_TITLE, gridProperties: { frozenRowCount: 1 } } } }] })
+    assert.equal(header?.method, 'PUT')
+    assert.deepEqual(header.body, { values: [HEADER] })
+  })
+
+  it('updates the existing row for a key', async () => {
+    const google = fakeGoogle({ rows: [HEADER, ['other'], [consideration.key]] })
+    await createSheetsClient(tokens(), google.fetchFn).save(ID, consideration)
+    const write = google.calls.at(-1)
+    assert.equal(write?.method, 'PUT')
+    assert.match(write.url, new RegExp(`^${ID}/values/${RANGE}A3%3AG3\\?valueInputOption=RAW$`))
+    const [key, calling, member, considering, , notes, data] = (write.body as { values: string[][] }).values[0] ?? []
+    assert.deepEqual([key, calling, member, considering, notes], ['Bishop|p1|0', 'Bishop', 'p1', 'm1\nm2', 'm1: Available after June'])
+    assert.deepEqual(JSON.parse(data ?? ''), consideration.candidates)
+  })
+
+  it('appends a row for a new key', async () => {
+    const google = fakeGoogle()
+    await createSheetsClient(tokens(), google.fetchFn).save(ID, consideration)
+    const write = google.calls.at(-1)
+    assert.equal(write?.method, 'POST')
+    assert.match(write.url, /A%3AG:append\?valueInputOption=RAW&insertDataOption=INSERT_ROWS$/)
+  })
+
+  it('retries once with a fresh token when Google rejects one', async () => {
+    const t = tokens()
+    const google = fakeGoogle({ status: [401] })
+    await createSheetsClient(t, google.fetchFn).load(ID)
+    assert.deepEqual(t.invalidated, ['token1'])
+  })
+
+  it('reports Google\'s error message', async () => {
+    const google = fakeGoogle({ status: [403] })
+    await assert.rejects(createSheetsClient(tokens(), google.fetchFn).load(ID), { message: 'status 403', status: 403 })
+  })
+})
