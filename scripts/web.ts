@@ -1,5 +1,4 @@
 import * as esbuild from 'esbuild'
-import getPort from 'get-port'
 import { existsSync } from 'node:fs'
 import { copyFile, mkdir, rm } from 'node:fs/promises'
 
@@ -43,10 +42,9 @@ await copyFile('icons/icon-128.png', `${outdir}/icon-128.png`)
 
 if (serve) {
   const host = '127.0.0.1'
-  const port = await getPort({ port: 8002 })
   const ctx = await esbuild.context({ ...options, write: false })
-  await ctx.serve({ servedir: outdir, host, port })
-  console.log(`Web page running at http://${host}:${String(port)}/ (add it to the OAuth client's JavaScript origins to sign in)`)
+  await ctx.serve({ servedir: outdir, host, port: 8002 })
+  console.log(`Web page running at http://${host}:8002}/ (add it to the OAuth client's JavaScript origins to sign in)`)
 }
 else {
   await esbuild.build(options)
