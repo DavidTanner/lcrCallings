@@ -197,6 +197,52 @@ describe('App', () => {
     assert.equal(notes('Bishop', 'Cole, Dee')?.value, 'From someone else')
   })
 
+  it('syncs every calling on the page to the sheet', async () => {
+    const api = fakeApi({ spreadsheetId: SHEET_ID, sheet: { 'Bishop|p1|0': [{ id: 'm1', notes: 'Theirs' }] } })
+    renderApp(api)
+    await screen.findByText(/Tracking/)
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Sync all callings' }))
+      await Promise.resolve()
+    })
+    assert.ok(await screen.findByText('Added 1 calling to the sheet.'))
+    assert.deepEqual(api.synced, [{ key: 'Ward Clerk|vacant|0', calling: 'Ward Clerk', member: '', candidates: [] }])
+    assert.deepEqual(api.sheet['Bishop|p1|0'], [{ id: 'm1', notes: 'Theirs' }])
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Sync all callings' }))
+      await Promise.resolve()
+    })
+    assert.ok(await screen.findByText('Every calling is already in the sheet.'))
+  })
+
+  it('saves notes still being typed before syncing', async () => {
+    const api = fakeApi({ spreadsheetId: SHEET_ID, sheet: { 'Bishop|p1|0': [{ id: 'm1', notes: '' }] } })
+    renderApp(api)
+    await screen.findByText(/Tracking/)
+    const field = notes('Bishop', 'Abel, Bea')
+    assert.ok(field)
+    fireEvent.change(field, { target: { value: 'Ask soon' } })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Sync all callings' }))
+      await Promise.resolve()
+    })
+    await screen.findByText(/Added 1 calling/)
+    assert.deepEqual(api.saved.map(c => c.candidates), [[{ id: 'm1', notes: 'Ask soon' }]])
+  })
+
+  it('reports sync failures', async () => {
+    const api = fakeApi({ spreadsheetId: SHEET_ID })
+    renderApp(api)
+    await screen.findByText(/Tracking/)
+    api.failWith = 'Quota exceeded'
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Sync all callings' }))
+      await Promise.resolve()
+    })
+    assert.ok(await screen.findByText('Couldn\'t sync: Quota exceeded'))
+  })
+
   it('lets the user retry when the sheet cannot be opened', async () => {
     const api = fakeApi({ spreadsheetId: SHEET_ID })
     api.failWith = 'Requested entity was not found.'

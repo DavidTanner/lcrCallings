@@ -17,6 +17,10 @@ Built with React, Mantine, TypeScript 6 and esbuild.
    Released, …) and add notes in the fields that appear under them. Picks and
    statuses save right away, notes after a second's pause or when you leave
    the box; **Refresh** pulls in changes others made.
+4. **Sync all callings** adds a row to the sheet for every calling on the page
+   that isn't in it yet, so the sheet lists them all, not just the ones
+   someone has picked candidates for. Rows already in the sheet are left as
+   they are.
 
 Members come from LCR's Member List page (`/mlt/records/member-list`),
 fetched with your LCR session.
@@ -68,12 +72,24 @@ assigns its own id, so add that id to the OAuth client too).
 | ------------------- | ------------------------------------------------------------------------ |
 | `npm run build`     | Builds the extension into `dist/`                                        |
 | `npm run dev`       | Rebuilds `dist/` on change (reload the extension in `chrome://extensions` to pick it up). If `resources/existingCallingsPage.html` exists it's served at http://127.0.0.1:8000/demo.html, where the dev build also runs, and `resources/mltRecordsMemberList.txt` answers its member list requests |
+| `npm run demo`      | Serves a mock Organizations page at http://127.0.0.1:8001/ that runs the panel without Chrome, Google or real member data (see [Demo](#demo)) |
 | `npm run keygen`    | Adds a key pinning the extension id to `.env`                            |
 | `npm run members -- [file]` | Prints the members in a saved LCR page payload as JSON (default `resources/mltRecordsMemberList.txt`) |
 | `npm test`          | Runs `node:test` over `src/**/*.test.{ts,tsx}` and `scripts/**/*.test.ts` |
 | `npm run lint`      | ESLint (typescript-eslint strict + `@stylistic`, no semicolons)           |
 | `npm run typecheck` | `tsc`                                                                     |
 | `npm run check`     | Typecheck, lint and test                                                  |
+
+## Demo
+
+`npm run demo` serves `demo/` at http://127.0.0.1:8001/: a mock of LCR's
+Organizations page for a made-up ward, with a button standing in for the
+toolbar button. It runs the real panel and column (`src/mount.tsx`) with a
+fake `ExtensionApi` (`demo/api.ts`) whose "shared sheet" lives in the
+browser's `localStorage`, starting with a few callings already being
+considered, and whose members are made up (`demo/data.ts`). Nothing is sent
+anywhere, so it's safe to show or share. **Reset demo** puts the sheet back;
+`?open` opens the panel on load.
 
 ## How it works
 

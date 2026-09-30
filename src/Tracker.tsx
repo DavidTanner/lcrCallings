@@ -68,13 +68,18 @@ export function Tracker({ doc, api, spreadsheetId, initial, onChangeSheet }: Tra
   const [saving, setSaving] = useState(0)
   const [error, setError] = useState<string>()
   const [refreshing, setRefreshing] = useState(false)
+  const [syncing, setSyncing] = useState(false)
+  /** what the last sync did */
+  const [synced, setSynced] = useState<string>()
   const [layer] = useState(() => createLayer(doc))
   /** notes edits waiting for typing to pause, by row key */
   const pending = useRef(new Map<string, PendingEdit>())
+  /** saves that haven't finished, which never reject */
+  const inFlight = useRef(new Set<Promise<void>>())
 
   const save = useCallback((row: CallingRow, candidates: Candidate[]) => {
     setSaving(n => n + 1)
-    api.save(spreadsheetId, { key: row.key, calling: row.calling, member: row.member, candidates }).then(
+    const saved = api.save(spreadsheetId, { key: row.key, calling: row.calling, member: row.member, candidates }).then(
       () => {
         setError(undefined)
       },
@@ -83,7 +88,9 @@ export function Tracker({ doc, api, spreadsheetId, initial, onChangeSheet }: Tra
       },
     ).finally(() => {
       setSaving(n => n - 1)
+      inFlight.current.delete(saved)
     })
+    inFlight.current.add(saved)
   }, [api, spreadsheetId])
 
   /** Saves a row's pending edit now, if it has one */
@@ -177,6 +184,33 @@ export function Tracker({ doc, api, spreadsheetId, initial, onChangeSheet }: Tra
     }
   }
 
+  /** Adds a row to the sheet for every calling on the page that isn't in it yet */
+  const syncAll = async () => {
+    setSyncing(true)
+    setSynced(undefined)
+    try {
+      // let edits land first, so a row they add isn't added again
+      for (const key of [...pending.current.keys()]) flush(key)
+      await Promise.all(inFlight.current)
+      const added = await api.sync(spreadsheetId, rows.map(row => ({
+        key: row.key,
+        calling: row.calling,
+        member: row.member,
+        candidates: values[row.key] ?? NO_CANDIDATES,
+      })))
+      setSynced(added
+        ? `Added ${String(added)} ${added === 1 ? 'calling' : 'callings'} to the sheet.`
+        : 'Every calling is already in the sheet.')
+      setError(undefined)
+    }
+    catch (e) {
+      setError(`Couldn't sync: ${message(e)}`)
+    }
+    finally {
+      setSyncing(false)
+    }
+  }
+
   return (
     <>
       {rows.length
@@ -196,8 +230,10 @@ export function Tracker({ doc, api, spreadsheetId, initial, onChangeSheet }: Tra
       {error
         ? <Text size="sm" c="red">{error}</Text>
         : <Text size="xs" c="dimmed">{saving ? 'Saving…' : 'All changes saved'}</Text>}
-      <Group>
+      {synced && <Text size="xs" c="dimmed">{synced}</Text>}
+      <Group gap="xs">
         <Button size="xs" variant="default" loading={refreshing} onClick={() => void refresh()}>Refresh</Button>
+        <Button size="xs" variant="default" loading={syncing} disabled={!rows.length} onClick={() => void syncAll()}>Sync all callings</Button>
         <Button size="xs" variant="subtle" onClick={onChangeSheet}>Change sheet</Button>
       </Group>
       {rows.map(row => createPortal(

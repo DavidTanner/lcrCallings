@@ -17,8 +17,10 @@ export interface FakeApiOptions {
 /** An in-memory extension backed by a pretend spreadsheet */
 export function fakeApi({ spreadsheetId, sheet = {}, members = MEMBERS }: FakeApiOptions = {}) {
   const saved: Consideration[] = []
-  const api: ExtensionApi & { saved: Consideration[], sheet: Record<string, Candidate[]>, failWith?: string, membersFailWith?: string } = {
+  const synced: Consideration[] = []
+  const api: ExtensionApi & { saved: Consideration[], synced: Consideration[], sheet: Record<string, Candidate[]>, failWith?: string, membersFailWith?: string } = {
     saved,
+    synced,
     sheet,
     getSpreadsheetId: () => Promise.resolve(spreadsheetId),
     setSpreadsheetId: (id) => {
@@ -31,6 +33,15 @@ export function fakeApi({ spreadsheetId, sheet = {}, members = MEMBERS }: FakeAp
       saved.push(consideration)
       api.sheet[consideration.key] = consideration.candidates
       return Promise.resolve()
+    },
+    sync: (_id, considerations) => {
+      if (api.failWith) return Promise.reject(new Error(api.failWith))
+      const missing = considerations.filter(c => !(c.key in api.sheet))
+      for (const c of missing) {
+        synced.push(c)
+        api.sheet[c.key] = c.candidates
+      }
+      return Promise.resolve(missing.length)
     },
     loadMembers: () => api.membersFailWith ? Promise.reject(new Error(api.membersFailWith)) : Promise.resolve(members),
   }

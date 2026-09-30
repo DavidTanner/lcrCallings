@@ -17,6 +17,8 @@ async function handle(request: BackgroundRequest): Promise<BackgroundResponses[B
     case 'save':
       await sheets.save(request.spreadsheetId, request.consideration)
       return null
+    case 'sync':
+      return sheets.sync(request.spreadsheetId, request.considerations)
   }
 }
 

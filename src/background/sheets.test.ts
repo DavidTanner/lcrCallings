@@ -115,6 +115,24 @@ describe('createSheetsClient', () => {
     assert.match(write.url, /A%3AH:append\?valueInputOption=RAW&insertDataOption=INSERT_ROWS$/)
   })
 
+  it('appends rows for keys not in the sheet yet in one request', async () => {
+    const google = fakeGoogle({ rows: [HEADER, [consideration.key]] })
+    const vacant = { key: 'Ward Clerk|vacant|0', calling: 'Ward Clerk', member: '', candidates: [] }
+    const added = await createSheetsClient(tokens(), google.fetchFn).sync(ID, [consideration, vacant])
+    assert.equal(added, 1)
+    const writes = google.calls.filter(c => c.method !== 'GET')
+    assert.equal(writes.length, 1)
+    assert.match(writes[0]?.url ?? '', /A%3AH:append\?valueInputOption=RAW&insertDataOption=INSERT_ROWS$/)
+    const [[key, calling, member, considering, , notes, data, status] = []] = (writes[0]?.body as { values: string[][] }).values
+    assert.deepEqual([key, calling, member, considering, notes, data, status], ['Ward Clerk|vacant|0', 'Ward Clerk', '', '', '', '', ''])
+  })
+
+  it('writes nothing when every key is already in the sheet', async () => {
+    const google = fakeGoogle({ rows: [HEADER, [consideration.key]] })
+    assert.equal(await createSheetsClient(tokens(), google.fetchFn).sync(ID, [consideration]), 0)
+    assert.equal(google.calls.filter(c => c.method !== 'GET').length, 0)
+  })
+
   it('retries once with a fresh token when Google rejects one', async () => {
     const t = tokens()
     const google = fakeGoogle({ status: [401] })

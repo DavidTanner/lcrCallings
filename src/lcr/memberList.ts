@@ -60,7 +60,6 @@ export function memberListAction(actions: ServerAction[]): ServerAction | undefi
 }
 
 async function lcrFetch(url: string, init: RequestInit, fetchFn: FetchFn): Promise<Response> {
-  console.log({ init })
   const response = await fetchFn(url, {
     ...init,
   })

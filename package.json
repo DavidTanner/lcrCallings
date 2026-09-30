@@ -9,13 +9,14 @@
   },
   "scripts": {
     "build": "tsx scripts/build.ts",
-    "dev": "tsx scripts/build.ts --watch",
+    "dev": "tsx scripts/build.ts --dev",
+    "demo": "tsx scripts/demo.ts",
     "keygen": "tsx scripts/keygen.ts",
     "members": "tsx scripts/members.ts",
     "typecheck": "tsc",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "test": "node --import tsx --import ./test/setup.ts --test \"src/**/*.test.{ts,tsx}\" \"scripts/**/*.test.ts\"",
+    "test": "node --import tsx --import ./test/setup.ts --test \"src/**/*.test.{ts,tsx}\" \"scripts/**/*.test.ts\" \"demo/**/*.test.ts\"",
     "check": "npm run typecheck && npm run lint && npm test"
   },
   "dependencies": {
@@ -36,6 +37,7 @@
     "esbuild": "^0.28.2",
     "eslint": "^10.11.0",
     "eslint-plugin-react-hooks": "^7.1.1",
+    "get-port": "^7.2.0",
     "global-jsdom": "^30.0.0",
     "globals": "^17.12.0",
     "jiti": "^2.7.0",

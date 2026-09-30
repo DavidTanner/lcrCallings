@@ -58,6 +58,11 @@ export function createSheetsClient(tokens: TokenProvider, fetchFn: (url: string,
     candidates.length ? JSON.stringify(candidates) : '',
     candidates.filter(c => c.status).map(c => `${c.id}: ${c.status ?? ''}`).join('\n'),
   ]
+  const append = (id: string, considerations: Consideration[]) =>
+    request(`${range(id, `A:${LAST_COLUMN}`)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`, {
+      method: 'POST',
+      body: JSON.stringify({ values: considerations.map(row) }),
+    })
   const writeHeader = (id: string) =>
     request(`${range(id, 'A1')}?valueInputOption=RAW`, { method: 'PUT', body: JSON.stringify({ values: [HEADER] }) })
 
@@ -108,13 +113,26 @@ export function createSheetsClient(tokens: TokenProvider, fetchFn: (url: string,
       await ensureSheet(id)
       // look the row up fresh each time: others may have added rows since
       const index = (await keys(id)).lastIndexOf(consideration.key)
-      const values = JSON.stringify({ values: [row(consideration)] })
       if (index > 0) {
+        const values = JSON.stringify({ values: [row(consideration)] })
         await request(`${range(id, `A${String(index + 1)}:${LAST_COLUMN}${String(index + 1)}`)}?valueInputOption=RAW`, { method: 'PUT', body: values })
       }
       else {
-        await request(`${range(id, `A:${LAST_COLUMN}`)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`, { method: 'POST', body: values })
+        await append(id, [consideration])
       }
+    },
+
+    /**
+     * Appends a row, in one request, for each consideration whose key isn't in
+     * the sheet yet. Rows already there are left alone, so edits others made
+     * aren't overwritten. Returns how many rows were added.
+     */
+    async sync(id: string, considerations: Consideration[]): Promise<number> {
+      await ensureSheet(id)
+      const existing = new Set(await keys(id))
+      const missing = considerations.filter(c => !existing.has(c.key))
+      if (missing.length) await append(id, missing)
+      return missing.length
     },
   }
 }
