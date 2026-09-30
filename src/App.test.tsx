@@ -1,5 +1,5 @@
 import { MantineProvider } from '@mantine/core'
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import assert from 'node:assert/strict'
 import { afterEach, beforeEach, describe, it, mock } from 'node:test'
 import { fakeApi, MEMBERS, orgTable } from '../test/fixtures'
@@ -182,6 +182,14 @@ describe('App', () => {
     api.membersFailWith = 'Couldn\'t get the member list from LCR'
     renderApp(api)
     assert.ok(await screen.findByText('Couldn\'t get the member list from LCR'))
+  })
+
+  it('copies the member list to the sheet', async () => {
+    const api = fakeApi({ spreadsheetId: SHEET_ID })
+    renderApp(api)
+    await waitFor(() => {
+      assert.deepEqual(api.savedMembers, MEMBERS)
+    })
   })
 
   it('refreshes with changes others made', async () => {

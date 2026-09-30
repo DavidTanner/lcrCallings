@@ -18,7 +18,7 @@ export interface FakeApiOptions {
 export function fakeApi({ spreadsheetId, sheet = {}, members = MEMBERS }: FakeApiOptions = {}) {
   const saved: Consideration[] = []
   const synced: Consideration[] = []
-  const api: ExtensionApi & { saved: Consideration[], synced: Consideration[], sheet: Record<string, Candidate[]>, failWith?: string, membersFailWith?: string } = {
+  const api: ExtensionApi & { saved: Consideration[], synced: Consideration[], sheet: Record<string, Candidate[]>, failWith?: string, membersFailWith?: string, savedMembers?: Member[] } = {
     saved,
     synced,
     sheet,
@@ -44,6 +44,11 @@ export function fakeApi({ spreadsheetId, sheet = {}, members = MEMBERS }: FakeAp
       return Promise.resolve(missing.length)
     },
     loadMembers: () => api.membersFailWith ? Promise.reject(new Error(api.membersFailWith)) : Promise.resolve(members),
+    saveMembers: (_id, saved) => {
+      if (api.failWith) return Promise.reject(new Error(api.failWith))
+      api.savedMembers = saved
+      return Promise.resolve()
+    },
   }
   return api
 }

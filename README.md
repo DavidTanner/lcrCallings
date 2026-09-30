@@ -23,7 +23,9 @@ Built with React, Mantine, TypeScript 6 and esbuild.
    they are.
 
 Members come from LCR's Member List page (`/mlt/records/member-list`),
-fetched with your LCR session.
+fetched with your LCR session. Each time the panel opens, the extension also
+copies each member's id and name (nothing else) into a `Members` tab in the
+sheet, for the [web page](#web-page).
 
 The extension keeps its rows in a `Considering` tab it adds to the sheet:
 `Key | Calling | Held by | Considering | Updated | Notes | Data | Status`. Members are
@@ -66,6 +68,38 @@ To share it, send others the built `dist/` folder to load unpacked, or publish
 it to the Chrome Web Store as unlisted (upload a zip of `dist/`; the store
 assigns its own id, so add that id to the OAuth client too).
 
+## Web page
+
+For people who can't install the extension, e.g. on an iPad, `web/` is a
+static page that shows every calling in the sheet and lets them pick
+candidates and set statuses and notes, saving to the same sheet. It signs in
+with Google in the browser and talks to the Sheets API directly, so it needs
+no server. It only knows what's in the sheet, so someone with the extension
+needs to have pressed **Sync all callings** (for the callings) and opened the
+panel (for the `Members` tab, which holds the names). Changes made there show
+in the extension on **Refresh**, and the other way round.
+
+Open it with `?sheet=<link or id>` to pick the sheet, e.g.
+`https://<you>.gitlab.io/callings/?sheet=https://docs.google.com/spreadsheets/d/…`,
+or paste the sheet's link the first time it opens. It's remembered after that.
+
+To set it up:
+
+1. In the same Google Cloud project, create another **OAuth client ID**, of
+   type **Web application**, with the page's origin (e.g.
+   `https://<you>.gitlab.io`, and `http://127.0.0.1:8002` for `npm run web`)
+   under **Authorized JavaScript origins**. Everyone using it still needs to
+   be a test user on the consent screen.
+2. On GitLab, add its client id as a CI/CD variable `WEB_OAUTH_CLIENT_ID`
+   (Settings → CI/CD → Variables), and optionally `SPREADSHEET_ID` so the
+   page opens that sheet without being told. Neither is secret: they end up
+   in the page.
+3. Push to the default branch. `.gitlab-ci.yml` runs the checks and publishes
+   `public/` to GitLab Pages.
+
+Google's tokens last an hour. When one runs out the page keeps unsaved edits
+and shows **Save again**, which signs in again and saves them.
+
 ## Scripts
 
 | Command             | What it does                                                             |
@@ -74,6 +108,8 @@ assigns its own id, so add that id to the OAuth client too).
 | `npm run dev`       | Rebuilds `dist/` on change (reload the extension in `chrome://extensions` to pick it up). If `resources/existingCallingsPage.html` exists it's served at http://127.0.0.1:8000/demo.html, where the dev build also runs, and `resources/mltRecordsMemberList.txt` answers its member list requests |
 | `npm run demo`      | Serves a mock Organizations page at http://127.0.0.1:8001/ that runs the panel without Chrome, Google or real member data (see [Demo](#demo)) |
 | `npm run keygen`    | Adds a key pinning the extension id to `.env`                            |
+| `npm run web`       | Serves the [web page](#web-page) at http://127.0.0.1:8002/, rebuilding on each load (needs `WEB_OAUTH_CLIENT_ID` in `.env`) |
+| `npm run web:build` | Builds the web page into `public/`                                       |
 | `npm run members -- [file]` | Prints the members in a saved LCR page payload as JSON (default `resources/mltRecordsMemberList.txt`) |
 | `npm test`          | Runs `node:test` over `src/**/*.test.{ts,tsx}` and `scripts/**/*.test.ts` |
 | `npm run lint`      | ESLint (typescript-eslint strict + `@stylistic`, no semicolons)           |
@@ -119,6 +155,10 @@ anywhere, so it's safe to show or share. **Reset demo** puts the sheet back;
   page (`fetchMemberList`), asking for its payload with the `RSC` header, or
   pulling it out of the page's HTML (`flightFromHtml`) if that's what comes
   back. It needs the LCR session cookie, so it runs in the content script.
+- `web/` is the web page. `google.ts` gets tokens from Google Identity
+  Services for the same Sheets client the extension uses; the page reuses
+  the extension's candidate field (`src/CandidatesField.tsx`) and editing
+  and saving (`src/useConsiderations.ts`).
 - `scripts/manifest.ts` generates `manifest.json` from `package.json` and
   `.env`.
 - `resources/` holds saved LCR pages for development. They contain member

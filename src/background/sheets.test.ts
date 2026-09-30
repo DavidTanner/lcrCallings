@@ -1,14 +1,15 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { candidatesIn, createSheetsClient, HEADER, SHEET_TITLE, type TokenProvider } from './sheets'
+import { candidatesIn, createSheetsClient, HEADER, MEMBERS_TITLE, SHEET_TITLE, type TokenProvider } from './sheets'
 
 const ID = 'sheet1'
 const RANGE = encodeURIComponent(`'${SHEET_TITLE}'!`)
+const MEMBERS_RANGE = encodeURIComponent(`'${MEMBERS_TITLE}'!`)
 
 interface Call { method: string, url: string, body?: unknown }
 
 /** A fetch that answers from a pretend spreadsheet and records every call */
-function fakeGoogle({ tabs = [SHEET_TITLE], rows = [HEADER] as string[][], status }: { tabs?: string[], rows?: string[][], status?: number[] } = {}) {
+function fakeGoogle({ tabs = [SHEET_TITLE], rows = [HEADER] as string[][], members = [] as string[][], status }: { tabs?: string[], rows?: string[][], members?: string[][], status?: number[] } = {}) {
   const calls: Call[] = []
   const fetchFn = (input: string, init: RequestInit = {}) => {
     const url = input.replace('https://sheets.googleapis.com/v4/spreadsheets/', '')
@@ -21,6 +22,7 @@ function fakeGoogle({ tabs = [SHEET_TITLE], rows = [HEADER] as string[][], statu
     if (url.includes(`${RANGE}A%3AA`)) return reply({ values: rows.map(([key = '']) => [key]) })
     if (url.includes(`${RANGE}A1%3AH1`)) return reply({ values: rows.slice(0, 1) })
     if (url.includes(`${RANGE}A2%3AH`)) return reply({ values: rows.slice(1) })
+    if (url.endsWith(`${MEMBERS_RANGE}A2%3AB`)) return reply({ values: members })
     return reply({})
   }
   return { calls, fetchFn: fetchFn }
@@ -143,5 +145,44 @@ describe('createSheetsClient', () => {
   it('reports Google\'s error message', async () => {
     const google = fakeGoogle({ status: [403] })
     await assert.rejects(createSheetsClient(tokens(), google.fetchFn).load(ID), { message: 'status 403', status: 403 })
+  })
+
+  it('loads every row with its calling and holder, in sheet order', async () => {
+    const data = JSON.stringify(consideration.candidates)
+    const google = fakeGoogle({ rows: [HEADER, ['a', 'Bishop', 'p1', '', '', '', data], ['', 'Blank'], ['b', 'Clerk'], ['a', 'Bishop', 'p1', '', '', '', '[]']] })
+    const rows = await createSheetsClient(tokens(), google.fetchFn).loadRows(ID)
+    assert.deepEqual(rows, [
+      { key: 'a', calling: 'Bishop', member: 'p1', candidates: [] },
+      { key: 'b', calling: 'Clerk', member: '', candidates: [] },
+    ])
+  })
+
+  it('loads members from the Members tab', async () => {
+    const google = fakeGoogle({ tabs: [SHEET_TITLE, MEMBERS_TITLE], members: [['m1', 'Abel, Bea'], ['m2'], ['m3', 'Cole, Dee']] })
+    const members = await createSheetsClient(tokens(), google.fetchFn).loadMembers(ID)
+    assert.deepEqual(members, [{ uuid: 'm1', name: 'Abel, Bea' }, { uuid: 'm3', name: 'Cole, Dee' }])
+  })
+
+  it('loads no members when there is no Members tab yet', async () => {
+    const google = fakeGoogle()
+    assert.deepEqual(await createSheetsClient(tokens(), google.fetchFn).loadMembers(ID), [])
+    assert.equal(google.calls.length, 1)
+  })
+
+  it('writes members over the old ones, then clears any left over', async () => {
+    const google = fakeGoogle({ tabs: [SHEET_TITLE, MEMBERS_TITLE] })
+    await createSheetsClient(tokens(), google.fetchFn).saveMembers(ID, [{ uuid: 'm1', name: 'Abel, Bea' }, { uuid: 'm2', name: 'Baker, Cal' }])
+    const [write, clear] = google.calls.filter(c => c.method !== 'GET')
+    assert.equal(write?.method, 'PUT')
+    assert.match(write.url, new RegExp(`^${ID}/values/${MEMBERS_RANGE}A1%3AB3\\?valueInputOption=RAW$`))
+    assert.deepEqual(write.body, { values: [['Id', 'Name'], ['m1', 'Abel, Bea'], ['m2', 'Baker, Cal']] })
+    assert.match(clear?.url ?? '', new RegExp(`^${ID}/values/${MEMBERS_RANGE}A4%3AB:clear$`))
+  })
+
+  it('adds the Members tab when it is missing', async () => {
+    const google = fakeGoogle()
+    await createSheetsClient(tokens(), google.fetchFn).saveMembers(ID, [])
+    const addSheet = google.calls.find(c => c.url.endsWith(':batchUpdate'))
+    assert.deepEqual(addSheet?.body, { requests: [{ addSheet: { properties: { title: MEMBERS_TITLE, gridProperties: { frozenRowCount: 1 } } } }] })
   })
 })

@@ -1,3 +1,4 @@
+import type { SheetMember } from '../background/sheets'
 import type { Candidate, Consideration } from './consideration'
 
 /** Messages the content script sends the background service worker */
@@ -5,6 +6,7 @@ export type BackgroundRequest
   = | { type: 'load', spreadsheetId: string }
     | { type: 'save', spreadsheetId: string, consideration: Consideration }
     | { type: 'sync', spreadsheetId: string, considerations: Consideration[] }
+    | { type: 'saveMembers', spreadsheetId: string, members: SheetMember[] }
 
 export interface BackgroundResponses {
   /** key → who is being considered */
@@ -12,6 +14,7 @@ export interface BackgroundResponses {
   save: null
   /** how many rows were added */
   sync: number
+  saveMembers: null
 }
 
 export type Result<T> = { ok: true, data: T } | { ok: false, error: string }

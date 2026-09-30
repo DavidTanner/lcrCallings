@@ -143,6 +143,8 @@ vite.config.ts.timestamp-*
 .vite/
 
 dist/
+# the web page's build, for GitLab Pages
+public/
 # saved LCR pages and API responses contain member data
 resources/
 .idea/

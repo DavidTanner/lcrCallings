@@ -68,6 +68,7 @@ export function demoApi({ storage = memoryStorage(), delayMs = 400 }: DemoApiOpt
       return missing.length
     },
     loadMembers: () => wait(MEMBERS),
+    saveMembers: () => wait(undefined),
   }
 }
 

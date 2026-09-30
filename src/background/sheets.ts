@@ -11,6 +11,19 @@ export const SHEET_TITLE = 'Considering'
 export const HEADER = ['Key', 'Calling', 'Held by', 'Considering', 'Updated', 'Notes', 'Data', 'Status']
 const LAST_COLUMN = 'H'
 
+/**
+ * Title of the tab the extension copies the unit's members into, so pages
+ * away from LCR, which can't read its member list, can show and pick names
+ */
+export const MEMBERS_TITLE = 'Members'
+export const MEMBERS_HEADER = ['Id', 'Name']
+
+/** Someone in the unit, as the Members tab keeps them */
+export interface SheetMember {
+  uuid: string
+  name: string
+}
+
 const API = 'https://sheets.googleapis.com/v4/spreadsheets'
 
 export interface TokenProvider {
@@ -47,7 +60,7 @@ export function createSheetsClient(tokens: TokenProvider, fetchFn: (url: string,
     return await response.json() as T
   }
 
-  const range = (id: string, a1: string) => `${encodeURIComponent(id)}/values/${encodeURIComponent(`'${SHEET_TITLE}'!${a1}`)}`
+  const range = (id: string, a1: string, tab = SHEET_TITLE) => `${encodeURIComponent(id)}/values/${encodeURIComponent(`'${tab}'!${a1}`)}`
   const row = ({ key, calling, member, candidates }: Consideration) => [
     key,
     calling,
@@ -66,16 +79,21 @@ export function createSheetsClient(tokens: TokenProvider, fetchFn: (url: string,
   const writeHeader = (id: string) =>
     request(`${range(id, 'A1')}?valueInputOption=RAW`, { method: 'PUT', body: JSON.stringify({ values: [HEADER] }) })
 
-  /** Adds the tab if the spreadsheet doesn't have it yet, and brings its header up to date */
-  async function prepare(id: string) {
+  async function tabs(id: string) {
     const { sheets = [] } = await request<{ sheets?: { properties: { title: string } }[] }>(
       `${encodeURIComponent(id)}?fields=sheets.properties.title`,
     )
-    if (!sheets.some(s => s.properties.title === SHEET_TITLE)) {
-      await request(`${encodeURIComponent(id)}:batchUpdate`, {
-        method: 'POST',
-        body: JSON.stringify({ requests: [{ addSheet: { properties: { title: SHEET_TITLE, gridProperties: { frozenRowCount: 1 } } } }] }),
-      })
+    return sheets.map(s => s.properties.title)
+  }
+  const addTab = (id: string, title: string) => request(`${encodeURIComponent(id)}:batchUpdate`, {
+    method: 'POST',
+    body: JSON.stringify({ requests: [{ addSheet: { properties: { title, gridProperties: { frozenRowCount: 1 } } } }] }),
+  })
+
+  /** Adds the tab if the spreadsheet doesn't have it yet, and brings its header up to date */
+  async function prepare(id: string) {
+    if (!(await tabs(id)).includes(SHEET_TITLE)) {
+      await addTab(id, SHEET_TITLE)
       await writeHeader(id)
       return
     }
@@ -100,12 +118,44 @@ export function createSheetsClient(tokens: TokenProvider, fetchFn: (url: string,
     return values.map(([key]) => key)
   }
 
+  /** Every row, in sheet order. Later rows win if a key is repeated, in the place of the first. */
+  async function loadRows(id: string): Promise<Consideration[]> {
+    await ensureSheet(id)
+    const { values = [] } = await request<{ values?: string[][] }>(range(id, `A2:${LAST_COLUMN}`))
+    const rows = new Map<string, Consideration>()
+    for (const row of values) {
+      const [key = '', calling = '', member = ''] = row
+      if (key) rows.set(key, { key, calling, member, candidates: candidatesIn(row) })
+    }
+    return [...rows.values()]
+  }
+
   return {
     /** key → who is being considered. Later rows win if a key is repeated. */
     async load(id: string): Promise<Record<string, Candidate[]>> {
-      await ensureSheet(id)
-      const { values = [] } = await request<{ values?: string[][] }>(range(id, `A2:${LAST_COLUMN}`))
-      return Object.fromEntries(values.filter(([key]) => key).map(values => [values[0] ?? '', candidatesIn(values)]))
+      const rows = await loadRows(id)
+      return Object.fromEntries(rows.map(({ key, candidates }) => [key, candidates]))
+    },
+
+    loadRows,
+
+    /** The members the extension copied into the Members tab; none if it hasn't yet */
+    async loadMembers(id: string): Promise<SheetMember[]> {
+      if (!(await tabs(id)).includes(MEMBERS_TITLE)) return []
+      const { values = [] } = await request<{ values?: string[][] }>(range(id, 'A2:B', MEMBERS_TITLE))
+      return values.flatMap(([uuid, name]) => uuid && name ? [{ uuid, name }] : [])
+    },
+
+    /**
+     * Replaces the Members tab with `members`, adding it if needed. Rows are
+     * written over the old ones before any left over are cleared, so someone
+     * reading it meanwhile never sees it empty.
+     */
+    async saveMembers(id: string, members: SheetMember[]): Promise<void> {
+      if (!(await tabs(id)).includes(MEMBERS_TITLE)) await addTab(id, MEMBERS_TITLE)
+      const values = [MEMBERS_HEADER, ...members.map(m => [m.uuid, m.name])]
+      await request(`${range(id, `A1:B${String(values.length)}`, MEMBERS_TITLE)}?valueInputOption=RAW`, { method: 'PUT', body: JSON.stringify({ values }) })
+      await request(`${range(id, `A${String(values.length + 1)}:B`, MEMBERS_TITLE)}:clear`, { method: 'POST', body: '{}' })
     },
 
     /** Updates the row for this key, or appends one */

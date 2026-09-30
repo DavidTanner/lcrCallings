@@ -19,6 +19,9 @@ async function handle(request: BackgroundRequest): Promise<BackgroundResponses[B
       return null
     case 'sync':
       return sheets.sync(request.spreadsheetId, request.considerations)
+    case 'saveMembers':
+      await sheets.saveMembers(request.spreadsheetId, request.members)
+      return null
   }
 }
 

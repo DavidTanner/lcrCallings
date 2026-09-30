@@ -11,12 +11,14 @@
     "build": "tsx scripts/build.ts",
     "dev": "tsx scripts/build.ts --dev",
     "demo": "tsx scripts/demo.ts",
+    "web": "tsx scripts/web.ts --serve",
+    "web:build": "tsx scripts/web.ts",
     "keygen": "tsx scripts/keygen.ts",
     "members": "tsx scripts/members.ts",
     "typecheck": "tsc",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "test": "node --import tsx --import ./test/setup.ts --test \"src/**/*.test.{ts,tsx}\" \"scripts/**/*.test.ts\" \"demo/**/*.test.ts\"",
+    "test": "node --import tsx --import ./test/setup.ts --test \"src/**/*.test.{ts,tsx}\" \"scripts/**/*.test.ts\" \"demo/**/*.test.ts\" \"web/**/*.test.{ts,tsx}\"",
     "check": "npm run typecheck && npm run lint && npm test"
   },
   "dependencies": {

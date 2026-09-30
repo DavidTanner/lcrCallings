@@ -1,19 +1,18 @@
-import { Anchor, Button, type ComboboxItem, Group, MultiSelect, Select, Stack, Text, Textarea } from '@mantine/core'
+import { Anchor, Button, Group, Text } from '@mantine/core'
 import mantineCss from '@mantine/core/styles.css'
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { CandidatesField } from './CandidatesField'
 import { LAYER_ID } from './constants'
 import type { ExtensionApi } from './content/api'
 import type { Member } from './lcr/members'
-import { type CallingRow, COLUMN_TITLE, enhancePage } from './page/enhance'
+import { type CallingRow, enhancePage } from './page/enhance'
 import { shadowContainer } from './shadow'
-import { type Candidate, isStatus, STATUSES } from './shared/consideration'
+import type { Candidate, Consideration } from './shared/consideration'
 import { spreadsheetUrl } from './shared/spreadsheet'
+import { useConsiderations } from './useConsiderations'
 
-/** How long typing in notes pauses before they're saved */
-export const SAVE_DELAY_MS = 1000
-/** How many matching members the dropdown shows at once */
-const OPTION_LIMIT = 10
+export { SAVE_DELAY_MS } from './useConsiderations'
 
 const NO_CANDIDATES: Candidate[] = []
 
@@ -45,12 +44,6 @@ function createLayer(doc: Document) {
   return { host, target: lightContainer(host) }
 }
 
-interface PendingEdit {
-  row: CallingRow
-  candidates: Candidate[]
-  timer: ReturnType<typeof setTimeout>
-}
-
 export interface TrackerProps {
   doc: Document
   api: ExtensionApi
@@ -62,60 +55,16 @@ export interface TrackerProps {
 /** Adds the column to the page while mounted, saving edits to the sheet */
 export function Tracker({ doc, api, spreadsheetId, initial, onChangeSheet }: TrackerProps) {
   const [rows, setRows] = useState<CallingRow[]>([])
-  const [values, setValues] = useState(initial)
   const [members, setMembers] = useState<Member[]>()
   const [membersError, setMembersError] = useState<string>()
-  const [saving, setSaving] = useState(0)
-  const [error, setError] = useState<string>()
   const [refreshing, setRefreshing] = useState(false)
   const [syncing, setSyncing] = useState(false)
   /** what the last sync did */
   const [synced, setSynced] = useState<string>()
   const [layer] = useState(() => createLayer(doc))
-  /** notes edits waiting for typing to pause, by row key */
-  const pending = useRef(new Map<string, PendingEdit>())
-  /** saves that haven't finished, which never reject */
-  const inFlight = useRef(new Set<Promise<void>>())
 
-  const save = useCallback((row: CallingRow, candidates: Candidate[]) => {
-    setSaving(n => n + 1)
-    const saved = api.save(spreadsheetId, { key: row.key, calling: row.calling, member: row.member, candidates }).then(
-      () => {
-        setError(undefined)
-      },
-      (e: unknown) => {
-        setError(`Not saved: ${message(e)}`)
-      },
-    ).finally(() => {
-      setSaving(n => n - 1)
-      inFlight.current.delete(saved)
-    })
-    inFlight.current.add(saved)
-  }, [api, spreadsheetId])
-
-  /** Saves a row's pending edit now, if it has one */
-  const flush = useCallback((key: string) => {
-    const edit = pending.current.get(key)
-    if (!edit) return
-    clearTimeout(edit.timer)
-    pending.current.delete(key)
-    save(edit.row, edit.candidates)
-  }, [save])
-
-  const change = useCallback((row: CallingRow, candidates: Candidate[], debounce: boolean) => {
-    setValues(current => ({ ...current, [row.key]: candidates }))
-    clearTimeout(pending.current.get(row.key)?.timer)
-    if (debounce) {
-      const timer = setTimeout(() => {
-        flush(row.key)
-      }, SAVE_DELAY_MS)
-      pending.current.set(row.key, { row, candidates, timer })
-    }
-    else {
-      pending.current.delete(row.key)
-      save(row, candidates)
-    }
-  }, [flush, save])
+  const save = useCallback((consideration: Consideration) => api.save(spreadsheetId, consideration), [api, spreadsheetId])
+  const { values, change, flush, settle, replace, saving, error, setError } = useConsiderations(initial, save)
 
   useEffect(() => {
     const e = enhancePage(doc, (next) => {
@@ -134,19 +83,16 @@ export function Tracker({ doc, api, spreadsheetId, initial, onChangeSheet }: Tra
     }
   }, [doc, layer])
 
-  // don't lose notes still being typed when the panel closes
-  useEffect(() => {
-    const edits = pending.current
-    return () => {
-      for (const key of [...edits.keys()]) flush(key)
-    }
-  }, [flush])
-
   useEffect(() => {
     let live = true
     api.loadMembers().then(
-      (loaded) => {
-        if (live) setMembers(loaded)
+      async (loaded) => {
+        if (!live) return
+        setMembers(loaded)
+        // so the web page, which can't reach LCR, can show and pick names
+        await api.saveMembers(spreadsheetId, loaded).catch((e: unknown) => {
+          if (live) setError(`Couldn't copy member names to the sheet: ${message(e)}`)
+        })
       },
       (e: unknown) => {
         if (live) setMembersError(message(e))
@@ -155,7 +101,7 @@ export function Tracker({ doc, api, spreadsheetId, initial, onChangeSheet }: Tra
     return () => {
       live = false
     }
-  }, [api])
+  }, [api, spreadsheetId, setError])
 
   const options = useMemo(() => members?.map(m => ({ value: m.uuid, label: m.name })) ?? [], [members])
   const names = useMemo(() => new Map(options.map(o => [o.value, o.label])), [options])
@@ -164,16 +110,7 @@ export function Tracker({ doc, api, spreadsheetId, initial, onChangeSheet }: Tra
   const refresh = async () => {
     setRefreshing(true)
     try {
-      const fresh = await api.load(spreadsheetId)
-      // keep edits that haven't been saved yet
-      setValues((current) => {
-        const next = { ...fresh }
-        for (const key of pending.current.keys()) {
-          const value = current[key]
-          if (value) next[key] = value
-        }
-        return next
-      })
+      replace(await api.load(spreadsheetId))
       setError(undefined)
     }
     catch (e) {
@@ -190,8 +127,7 @@ export function Tracker({ doc, api, spreadsheetId, initial, onChangeSheet }: Tra
     setSynced(undefined)
     try {
       // let edits land first, so a row they add isn't added again
-      for (const key of [...pending.current.keys()]) flush(key)
-      await Promise.all(inFlight.current)
+      await settle()
       const added = await api.sync(spreadsheetId, rows.map(row => ({
         key: row.key,
         calling: row.calling,
@@ -254,109 +190,3 @@ export function Tracker({ doc, api, spreadsheetId, initial, onChangeSheet }: Tra
     </>
   )
 }
-
-/**
- * A candidate's name, from the member list. Someone typed in as free text is
- * named by that text, and anyone no longer in the list (moved out) by their
- * member uuid.
- */
-function candidateName(id: string, names: Map<string, string>, loading: boolean) {
-  const name = names.get(id)
-  if (name !== undefined) return name
-  if (id.startsWith('text:')) return id.slice('text:'.length)
-  return loading ? 'Loading…' : id
-}
-
-interface CandidatesFieldProps {
-  row: CallingRow
-  candidates: Candidate[]
-  /** the members who can be picked */
-  options: ComboboxItem[]
-  /** member uuid → name */
-  names: Map<string, string>
-  loading: boolean
-  /** why the member list couldn't be loaded */
-  membersError?: string
-  dropdownTarget: HTMLElement
-  onChange: (row: CallingRow, candidates: Candidate[], debounce: boolean) => void
-  /** called when the user leaves a notes field, to save it right away */
-  onDone: (key: string) => void
-}
-
-const STATUS_OPTIONS = [...STATUSES]
-
-/** Picks who is being considered for one calling, with a status and notes on each */
-const CandidatesField = memo(function CandidatesField({ row, candidates, options, names, loading, membersError, dropdownTarget, onChange, onDone }: CandidatesFieldProps) {
-  const nameOf = (id: string) => candidateName(id, names, loading)
-
-  // candidates who aren't in the member list (moved out, or typed in before
-  // there was one) still need an option to show as picked
-  const data = useMemo(() => {
-    const unlisted = candidates.filter(c => !names.has(c.id)).map(c => ({ value: c.id, label: candidateName(c.id, names, loading) }))
-    return unlisted.length ? [...unlisted, ...options] : options
-  }, [options, names, loading, candidates])
-
-  const pick = (ids: string[]) => {
-    onChange(row, ids.map(id => candidates.find(c => c.id === id) ?? { id, notes: '' }), false)
-  }
-
-  const setNotes = (id: string, notes: string) => {
-    onChange(row, candidates.map(c => c.id === id ? { ...c, notes } : c), true)
-  }
-
-  /** clearing the status leaves it out, as it is before one is picked */
-  const setStatus = (id: string, value: string | null) => {
-    onChange(row, candidates.map(c => c.id !== id ? c : isStatus(value) ? { ...c, status: value } : { id: c.id, notes: c.notes }), false)
-  }
-
-  return (
-    <Stack gap={4} miw={220}>
-      <MultiSelect
-        size="xs"
-        aria-label={`${COLUMN_TITLE} for ${row.calling}`}
-        placeholder={candidates.length ? undefined : loading ? 'Loading members…' : 'Pick members'}
-        data={data}
-        value={candidates.map(c => c.id)}
-        onChange={pick}
-        searchable
-        hidePickedOptions
-        limit={OPTION_LIMIT}
-        nothingFoundMessage={loading ? 'Loading members…' : membersError ? `Couldn't load members: ${membersError}` : 'No members found'}
-        // with a field in every row, keeping closed dropdowns around adds up
-        comboboxProps={{ keepMounted: false, portalProps: { target: dropdownTarget } }}
-      />
-      {candidates.map(c => (
-        <Stack key={c.id} gap={2}>
-          <Select
-            size="xs"
-            label={nameOf(c.id)}
-            aria-label={`Status of ${nameOf(c.id)} for ${row.calling}`}
-            placeholder="Status"
-            data={STATUS_OPTIONS}
-            value={c.status ?? null}
-            onChange={(value) => {
-              setStatus(c.id, value)
-            }}
-            clearable
-            comboboxProps={{ keepMounted: false, portalProps: { target: dropdownTarget } }}
-          />
-          <Textarea
-            size="xs"
-            aria-label={`Notes on ${nameOf(c.id)} for ${row.calling}`}
-            placeholder="Notes"
-            autosize
-            minRows={1}
-            maxRows={6}
-            value={c.notes}
-            onChange={(event) => {
-              setNotes(c.id, event.currentTarget.value)
-            }}
-            onBlur={() => {
-              onDone(row.key)
-            }}
-          />
-        </Stack>
-      ))}
-    </Stack>
-  )
-})

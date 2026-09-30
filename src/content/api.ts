@@ -14,6 +14,8 @@ export interface ExtensionApi {
   sync: (spreadsheetId: string, considerations: Consideration[]) => Promise<number>
   /** the unit's members, to pick candidates from */
   loadMembers: () => Promise<Member[]>
+  /** Copies members' names into the sheet, for pages away from LCR */
+  saveMembers: (spreadsheetId: string, members: Member[]) => Promise<void>
 }
 
 async function send<T extends BackgroundRequest>(request: T): Promise<BackgroundResponses[T['type']]> {
@@ -38,4 +40,8 @@ export const chromeApi: ExtensionApi = {
   // LCR's session cookie only goes with requests from the page's own origin,
   // so this is fetched here rather than in the background
   loadMembers: () => fetchMemberList(location.origin, fetch, new URLSearchParams(location.search).get('lang') ?? 'eng'),
+  saveMembers: async (spreadsheetId, members) => {
+    // only the id and name: the rest of LCR's member record stays out of the sheet
+    await send({ type: 'saveMembers', spreadsheetId, members: members.map(({ uuid, name }) => ({ uuid, name })) })
+  },
 }
