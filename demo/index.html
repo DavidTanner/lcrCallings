@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Organizations (Callings demo)</title>
+  <style>
+    /* Roughly LCR's look, so the column can be seen in context. The class
+       names the extension relies on match LCR's; the styles are approximate. */
+    :root {
+      --text: #212225;
+      --muted: #53575b;
+      --border: #d0d3d3;
+      --stripe: #f5f6f6;
+      --link: #006184;
+      --header: #1d3f5e;
+      --demo: #fff4d6;
+      --demo-border: #e8c766;
+      color-scheme: light;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #fff;
+      color: var(--text);
+      font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    button { font: inherit; }
+
+    .demo-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px 16px;
+      padding: 8px 16px;
+      background: var(--demo);
+      border-bottom: 1px solid var(--demo-border);
+      font-size: 14px;
+    }
+    .demo-bar p { margin: 0; flex: 1 1 320px; }
+    .demo-bar button {
+      padding: 4px 12px;
+      border: 1px solid var(--demo-border);
+      border-radius: 6px;
+      background: #fff;
+      cursor: pointer;
+    }
+    .demo-bar #demo-toggle { font-weight: 600; }
+
+    .lcr-header {
+      padding: 12px 16px;
+      background: var(--header);
+      color: #fff;
+      font-weight: 600;
+    }
+    main { max-width: 1200px; margin: 0 auto; padding: 24px 16px 64px; }
+
+    .eden-headings-h1 { font-size: 32px; margin: 0 0 8px; }
+    .eden-headings-h2 { font-size: 24px; margin: 32px 0 8px; }
+    .eden-headings-h3 { font-size: 19px; margin: 20px 0 8px; }
+    .eden-headings-h6 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+    .orgs__intro { color: var(--muted); margin: 0 0 8px; }
+
+    .eden-table-table { width: 100%; border-collapse: collapse; }
+    .eden-table-th {
+      text-align: start;
+      padding: 8px 12px;
+      border-bottom: 2px solid var(--border);
+      font-size: 14px;
+      color: var(--muted);
+    }
+    .eden-table-td { padding: 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .eden-table-table--striped tbody tr:nth-child(even) { background: var(--stripe); }
+    .orgs__td-small { width: 28%; }
+    .eden-table-card-view__cloned-column-header { display: none; }
+
+    .eden-button-a11y { border: 0; padding: 0; background: none; color: var(--link); cursor: pointer; text-align: start; }
+    .orgs__member:hover { text-decoration: underline; }
+    .orgs__vacant { color: var(--muted); font-style: italic; }
+    .orgs__edit:disabled { cursor: default; opacity: .6; }
+
+    /* LCR's card view on narrow screens, where the cloned headers show */
+    @media (max-width: 720px) {
+      .eden-table-table thead { display: none; }
+      .eden-table-table, .eden-table-table tbody, .eden-table-table tr, .eden-table-td { display: block; width: auto; }
+      .eden-table-table tr { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px; padding: 4px 0; }
+      .eden-table-td { border: 0; padding: 6px 12px; }
+      .eden-table-card-view__cloned-column-header { display: block; }
+    }
+  </style>
+</head>
+<body>
+  <div class="demo-bar">
+    <p><strong>Callings demo.</strong> A mock of LCR's Organizations page with made-up members, and a pretend shared sheet kept in this browser. The button stands in for the extension's toolbar button.</p>
+    <button type="button" id="demo-toggle">Callings</button>
+    <button type="button" id="demo-reset">Reset demo</button>
+  </div>
+  <div class="lcr-header">Leader and Clerk Resources</div>
+  <main>
+    <h1 class="eden-headings-h1">Organizations</h1>
+    <p class="orgs__intro">Sample Ward</p>
+    <div id="orgs"></div>
+  </main>
+  <script src="demo.js"></script>
+</body>
+</html>

@@ -141,3 +141,12 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+dist/
+# the web page's and demo's build, for GitHub Pages
+public/
+# saved LCR pages and API responses contain member data
+resources/
+.idea/
+.claude
+.DS_Store

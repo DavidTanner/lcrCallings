@@ -1,0 +1,54 @@
+{
+  "name": "callings",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tracks who is being considered for callings on the LCR Organizations page, in a shared Google Sheet",
+  "type": "module",
+  "engines": {
+    "node": ">=22.14"
+  },
+  "scripts": {
+    "build": "tsx scripts/build.ts",
+    "dev": "tsx scripts/build.ts --dev",
+    "demo": "tsx scripts/demo.ts",
+    "demo:build": "tsx scripts/demo.ts --build",
+    "demo:sheet": "tsx scripts/demo-sheet.ts",
+    "web": "tsx scripts/web.ts --serve",
+    "web:build": "tsx scripts/web.ts",
+    "pages:build": "npm run web:build && npm run demo:build",
+    "keygen": "tsx scripts/keygen.ts",
+    "members": "tsx scripts/members.ts",
+    "typecheck": "tsc",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "test": "node --import tsx --import ./test/setup.ts --test \"src/**/*.test.{ts,tsx}\" \"scripts/**/*.test.ts\" \"demo/**/*.test.ts\" \"web/**/*.test.{ts,tsx}\"",
+    "check": "npm run typecheck && npm run lint && npm test"
+  },
+  "dependencies": {
+    "@mantine/core": "^9.6.3",
+    "@mantine/hooks": "^9.6.3",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
+    "@types/chrome": "^0.3.0",
+    "@types/node": "^22.20.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.11.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "get-port": "^7.2.0",
+    "global-jsdom": "^30.0.0",
+    "globals": "^17.12.0",
+    "jiti": "^2.7.0",
+    "jsdom": "^30.1.1",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.70.1"
+  }
+}
