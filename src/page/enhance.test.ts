@@ -61,6 +61,21 @@ describe('enhancePage', () => {
     assert.equal(rows[0]?.slot.getAttribute(SLOT), 'Bishop|p1|0')
   })
 
+  it('reports the headings each row is under, as LCR nests them', () => {
+    document.body.innerHTML = '<h1>Organizations</h1><h2>Print Options</h2>'
+      + orgTable('Bishopric', [{ calling: 'Bishop', person: 'p1' }], 'h2')
+      + '<section><h2>Aaronic Priesthood Quorums</h2><div role="tabpanel"></div></section>'
+      + orgTable('Priests Quorum', [{ calling: 'Priests Quorum Adviser' }])
+      + orgTable('Priests Quorum Presidency', [{ calling: 'Priests Quorum First Assistant' }], 'h4')
+      + orgTable('Teachers Quorum', [{ calling: 'Teachers Quorum President' }])
+    assert.deepEqual(enhance().rows().map(({ calling, organization, position }) => ({ calling, organization, position })), [
+      { calling: 'Bishop', organization: ['Bishopric'], position: 0 },
+      { calling: 'Priests Quorum Adviser', organization: ['Aaronic Priesthood Quorums', 'Priests Quorum'], position: 1 },
+      { calling: 'Priests Quorum First Assistant', organization: ['Aaronic Priesthood Quorums', 'Priests Quorum', 'Priests Quorum Presidency'], position: 2 },
+      { calling: 'Teachers Quorum President', organization: ['Aaronic Priesthood Quorums', 'Teachers Quorum'], position: 3 },
+    ])
+  })
+
   it('is idempotent', () => {
     enhance()
     const html = document.body.innerHTML

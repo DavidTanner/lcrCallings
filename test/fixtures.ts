@@ -76,9 +76,9 @@ export function orgRow({ calling, person }: FixtureRow): string {
 }
 
 /** A section of LCR's Organizations page with one calling table */
-export function orgTable(heading: string, rows: FixtureRow[]): string {
+export function orgTable(heading: string, rows: FixtureRow[], level: 'h2' | 'h3' | 'h4' = 'h3'): string {
   const th = (text: string) => `<th class="eden-table-th" scope="col" role="columnheader" style="--x: 1">${cardLabel(text)}${text}</th>`
-  return `<section><h3>${heading}</h3><table role="grid" class="eden-table-table">`
+  return `<section><${level}>${heading}</${level}><table role="grid" class="eden-table-table">`
     + `<thead><tr role="row">${['Calling', 'Name', 'Sustained', 'Set Apart', ''].map(th).join('')}</tr></thead>`
     + `<tbody>${rows.map(orgRow).join('')}</tbody></table></section>`
 }

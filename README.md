@@ -20,7 +20,8 @@ Built with React, Mantine, TypeScript 6 and esbuild.
 4. **Sync all callings** adds a row to the sheet for every calling on the page
    that isn't in it yet, so the sheet lists them all, not just the ones
    someone has picked candidates for. Rows already in the sheet are left as
-   they are.
+   they are, except for their Organization and Position, which are brought up
+   to date.
 
 Members come from LCR's Member List page (`/mlt/records/member-list`),
 fetched with your LCR session. Each time the panel opens, the extension also
@@ -28,11 +29,15 @@ copies each member's id and name (nothing else) into a `Members` tab in the
 sheet, for the [web page](#web-page).
 
 The extension keeps its rows in a `Considering` tab it adds to the sheet:
-`Key | Calling | Held by | Considering | Updated | Notes | Data | Status`. Members are
+`Key | Calling | Held by | Considering | Updated | Notes | Data | Status | Organization | Position`. Members are
 recorded by their LCR member id (uuid), never by name, since members can share
 a name: Held by is the current holder's id, Considering lists each candidate's
 id, Notes are `<id>: <notes>`, Status is `<id>: <status>`, and Data (JSON) is
 `[{"id": …, "notes": …, "status": …}]` (status is left out until one is set).
+Organization is the headings the calling is under on the Organizations page,
+joined with ` > ` (e.g. `Aaronic Priesthood Quorums > Priests Quorum > Priests
+Quorum Presidency`), and Position is its place on the page, from 0, so the web
+page can group and order callings as LCR does.
 The extension shows names from LCR's member list; anyone no longer in it shows
 by their id. The key identifies the row by calling, current holder's member id
 and occurrence, so an entry stops showing once the calling changes hands. The
@@ -78,6 +83,11 @@ no server. It only knows what's in the sheet, so someone with the extension
 needs to have pressed **Sync all callings** (for the callings) and opened the
 panel (for the `Members` tab, which holds the names). Changes made there show
 in the extension on **Refresh**, and the other way round.
+
+Callings are grouped by organization, and the headings within it, in LCR's
+order, and the **Organization** picker shows just one. Callings the sheet
+doesn't have an Organization for yet (rows from before it was recorded) show
+last, under **Not grouped yet**, until someone presses **Sync all callings**.
 
 Open it with `?sheet=<link or id>` to pick the sheet, e.g.
 `https://<you>.gitlab.io/callings/?sheet=https://docs.google.com/spreadsheets/d/…`,

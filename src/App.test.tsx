@@ -97,7 +97,7 @@ describe('App', () => {
       fireEvent.click(options[1] as HTMLElement)
       await Promise.resolve()
     })
-    assert.deepEqual(api.saved.at(-1), { key: 'Ward Clerk|vacant|0', calling: 'Ward Clerk', member: '', candidates: [{ id: 'm4', notes: '' }] })
+    assert.deepEqual(api.saved.at(-1), { key: 'Ward Clerk|vacant|0', calling: 'Ward Clerk', member: '', organization: ['Bishopric'], position: 1, candidates: [{ id: 'm4', notes: '' }] })
   })
 
   it('saves candidates picked from the member list', async () => {
@@ -105,7 +105,7 @@ describe('App', () => {
     renderApp(api)
     await screen.findByText(/Tracking/)
     await pick('Bishop', 'Baker, Cal')
-    assert.deepEqual(api.saved, [{ key: 'Bishop|p1|0', calling: 'Bishop', member: 'p1', candidates: [{ id: 'm2', notes: '' }] }])
+    assert.deepEqual(api.saved, [{ key: 'Bishop|p1|0', calling: 'Bishop', member: 'p1', organization: ['Bishopric'], position: 0, candidates: [{ id: 'm2', notes: '' }] }])
     assert.deepEqual(picked('Bishop'), ['Baker, Cal'])
     assert.ok(notes('Bishop', 'Baker, Cal'))
     assert.ok(screen.getByText('All changes saved'))
@@ -214,7 +214,7 @@ describe('App', () => {
       await Promise.resolve()
     })
     assert.ok(await screen.findByText('Added 1 calling to the sheet.'))
-    assert.deepEqual(api.synced, [{ key: 'Ward Clerk|vacant|0', calling: 'Ward Clerk', member: '', candidates: [] }])
+    assert.deepEqual(api.synced, [{ key: 'Ward Clerk|vacant|0', calling: 'Ward Clerk', member: '', organization: ['Bishopric'], position: 1, candidates: [] }])
     assert.deepEqual(api.sheet['Bishop|p1|0'], [{ id: 'm1', notes: 'Theirs' }])
 
     await act(async () => {

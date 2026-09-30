@@ -1,10 +1,11 @@
-import { Alert, Anchor, Badge, Button, Group, Paper, SegmentedControl, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core'
+import { Alert, Anchor, Badge, Button, Group, Paper, SegmentedControl, Select, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core'
 import { useCallback, useMemo, useState } from 'react'
 import type { SheetMember, SheetsClient } from '../src/background/sheets'
 import { CandidatesField, candidateName } from '../src/CandidatesField'
 import type { Candidate, Consideration } from '../src/shared/consideration'
 import { spreadsheetUrl } from '../src/shared/spreadsheet'
 import { type CallingInfo, useConsiderations } from '../src/useConsiderations'
+import { byOrganization, UNGROUPED } from './organizations'
 
 /** What the page needs from Google Sheets, so it can be tested without Google */
 export type WebApi = Pick<SheetsClient, 'loadRows' | 'loadMembers' | 'save'>
@@ -30,6 +31,8 @@ export function Board({ api, spreadsheetId, rows: initialRows, members: initialM
   const [members, setMembers] = useState(initialMembers)
   const [search, setSearch] = useState('')
   const [show, setShow] = useState<Show>('all')
+  /** the one organization to show, or all of them */
+  const [organization, setOrganization] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
 
   const initial = useMemo(() => Object.fromEntries(initialRows.map(r => [r.key, r.candidates])), [initialRows])
@@ -69,15 +72,22 @@ export function Board({ api, spreadsheetId, rows: initialRows, members: initialM
 
   const holderName = (member: string) => member ? names.get(member) ?? 'Someone not on the member list' : undefined
 
+  const organizations = useMemo(() => byOrganization(callings), [callings])
+  const organizationNames = useMemo(() => organizations.map(o => o.name), [organizations])
+
   const query = search.trim().toLowerCase()
-  const shown = callings.filter(({ key, calling, member }) => {
+  const matches = ({ key, calling, member, organization: headings = [] }: CallingInfo) => {
     const candidates = values[key] ?? NO_CANDIDATES
     if (show === 'considering' && !candidates.length) return false
     if (show === 'vacant' && member) return false
     if (!query) return true
-    const text = [calling, holderName(member) ?? 'vacant', ...candidates.flatMap(c => [candidateName(c.id, names, false), c.status ?? '', c.notes])]
+    const text = [calling, ...headings, holderName(member) ?? 'vacant', ...candidates.flatMap(c => [candidateName(c.id, names, false), c.status ?? '', c.notes])]
     return text.some(t => t.toLowerCase().includes(query))
-  })
+  }
+  const shown = organizations
+    .filter(o => !organization || o.name === organization)
+    .map(o => ({ ...o, groups: o.groups.map(g => ({ ...g, rows: g.rows.filter(matches) })).filter(g => g.rows.length) }))
+    .filter(o => o.groups.length)
 
   return (
     <Stack gap="md">
@@ -111,16 +121,28 @@ export function Board({ api, spreadsheetId, rows: initialRows, members: initialM
       )}
 
       <Stack gap="xs">
-        <TextInput
-          type="search"
-          size="md"
-          placeholder="Search callings, names, statuses and notes"
-          aria-label="Search"
-          value={search}
-          onChange={(event) => {
-            setSearch(event.currentTarget.value)
-          }}
-        />
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xs" verticalSpacing="xs">
+          <TextInput
+            type="search"
+            size="md"
+            placeholder="Search callings, names, statuses and notes"
+            aria-label="Search"
+            value={search}
+            onChange={(event) => {
+              setSearch(event.currentTarget.value)
+            }}
+          />
+          <Select
+            size="md"
+            placeholder="All organizations"
+            aria-label="Organization"
+            data={organizationNames}
+            value={organization && organizationNames.includes(organization) ? organization : null}
+            onChange={setOrganization}
+            clearable
+            searchable
+          />
+        </SimpleGrid>
         <SegmentedControl
           fullWidth
           value={show}
@@ -135,31 +157,48 @@ export function Board({ api, spreadsheetId, rows: initialRows, members: initialM
         />
       </Stack>
 
-      {/* three columns from iPad width, so more callings fit on screen */}
-      <SimpleGrid cols={{ base: 1, xs: 2, sm: 3 }} spacing="xs" verticalSpacing="xs" style={{ alignItems: 'start' }}>
-        {shown.map(row => (
-          <Paper key={row.key} withBorder radius="md" p="xs">
-            <Stack gap={6}>
-              <div>
-                <Title order={3} size="h6" lh={1.3}>{row.calling}</Title>
-                {row.member
-                  ? <Text size="xs" c="dimmed" truncate>{holderName(row.member)}</Text>
-                  : <Badge size="xs" variant="light" color="gray">Vacant</Badge>}
-              </div>
-              <CandidatesField
-                row={row}
-                candidates={values[row.key] ?? NO_CANDIDATES}
-                options={options}
-                names={names}
-                loading={false}
-                onChange={change}
-                onDone={flush}
-                size="md"
-              />
+      {shown.map(({ name, groups }) => (
+        <Stack key={name} component="section" gap="xs" aria-label={name}>
+          <div>
+            <Title order={2} size="h3">{name}</Title>
+            {name === UNGROUPED && (
+              <Text size="sm" c="dimmed">
+                The sheet doesn&apos;t say which organization these are in yet. Someone with the extension can press Sync all callings on LCR&apos;s Organizations page to sort them.
+              </Text>
+            )}
+          </div>
+          {groups.map(group => (
+            <Stack key={group.name} gap={6}>
+              {group.name && <Title order={3} size="h5" c="dimmed">{group.name}</Title>}
+              {/* three columns from iPad width, so more callings fit on screen */}
+              <SimpleGrid cols={{ base: 1, xs: 2, sm: 3 }} spacing="xs" verticalSpacing="xs" style={{ alignItems: 'start' }}>
+                {group.rows.map(row => (
+                  <Paper key={row.key} withBorder radius="md" p="xs">
+                    <Stack gap={6}>
+                      <div>
+                        <Title order={4} size="h6" lh={1.3}>{row.calling}</Title>
+                        {row.member
+                          ? <Text size="xs" c="dimmed" truncate>{holderName(row.member)}</Text>
+                          : <Badge size="xs" variant="light" color="gray">Vacant</Badge>}
+                      </div>
+                      <CandidatesField
+                        row={row}
+                        candidates={values[row.key] ?? NO_CANDIDATES}
+                        options={options}
+                        names={names}
+                        loading={false}
+                        onChange={change}
+                        onDone={flush}
+                        size="md"
+                      />
+                    </Stack>
+                  </Paper>
+                ))}
+              </SimpleGrid>
             </Stack>
-          </Paper>
-        ))}
-      </SimpleGrid>
+          ))}
+        </Stack>
+      ))}
       {callings.length > 0 && !shown.length && <Text c="dimmed" ta="center">Nothing matches.</Text>}
     </Stack>
   )

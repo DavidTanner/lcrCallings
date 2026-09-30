@@ -1,5 +1,5 @@
 import { MantineProvider } from '@mantine/core'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import assert from 'node:assert/strict'
 import { afterEach, describe, it } from 'node:test'
 import type { SheetMember } from '../src/background/sheets'
@@ -134,6 +134,41 @@ describe('WebApp', () => {
     fireEvent.click(screen.getByRole('radio', { name: 'Considering' }))
     assert.equal(screen.queryByText('Bishop'), null)
     assert.ok(screen.getByText('Ward Clerk'))
+  })
+
+  it('groups callings by organization, and shows one organization at a time', async () => {
+    const auth = fakeAuth(true)
+    const rows: Consideration[] = [
+      { key: 'EQ Teacher|vacant|0', calling: 'Elders Quorum Teacher', member: '', organization: ['Elders Quorum', 'Teachers'], position: 2, candidates: [] },
+      { key: 'Organist|vacant|0', calling: 'Organist', member: '', candidates: [] },
+      ...ROWS.map((row, position) => ({ ...row, organization: ['Bishopric'], position })),
+    ]
+    renderApp(auth, fakeApi(auth, rows))
+    await screen.findByText('Bishop')
+    const headings = screen.getAllByRole('heading').filter(h => ['H2', 'H3'].includes(h.tagName)).map(h => h.textContent)
+    assert.deepEqual(headings, ['Bishopric', 'Elders Quorum', 'Teachers', 'Not grouped yet'])
+    assert.ok(within(screen.getByRole('region', { name: 'Bishopric' })).getByText('Ward Clerk'))
+
+    const select = screen.getByRole<HTMLInputElement>('combobox', { name: 'Organization' })
+    fireEvent.click(select)
+    await click(await screen.findByRole('option', { name: 'Elders Quorum' }))
+    assert.equal(select.value, 'Elders Quorum')
+    assert.equal(screen.queryByText('Bishop'), null)
+    assert.ok(screen.getByText('Elders Quorum Teacher'))
+
+    fireEvent.change(screen.getByLabelText('Search'), { target: { value: 'teachers' } })
+    assert.ok(screen.getByText('Elders Quorum Teacher'))
+  })
+
+  it('saves where the calling is along with its candidates', async () => {
+    const auth = fakeAuth(true)
+    const api = fakeApi(auth, [{ ...ROWS[0], organization: ['Bishopric'], position: 0 } as Consideration])
+    renderApp(auth, api)
+    const field = await screen.findByLabelText<HTMLInputElement>('Considering for Bishop')
+    fireEvent.click(field)
+    fireEvent.change(field, { target: { value: 'Bak' } })
+    await click(await screen.findByRole('option', { name: 'Baker, Cal' }))
+    assert.deepEqual(api.saved, [{ key: 'Bishop|p1|0', calling: 'Bishop', member: 'p1', organization: ['Bishopric'], position: 0, candidates: [{ id: 'm2', notes: '' }] }])
   })
 
   it('keeps edits made after signing out, and saves them once signed in again', async () => {

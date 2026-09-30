@@ -44,5 +44,25 @@ export interface Consideration {
   calling: string
   /** member uuid of whoever holds the calling now, '' when vacant */
   member: string
+  /**
+   * The headings the calling is under on the Organizations page, outermost
+   * first, e.g. `['Elders Quorum', 'Teachers']`. Left out when not known, as
+   * for rows saved before it was recorded.
+   */
+  organization?: string[]
+  /** Where the row is on the Organizations page, from 0; left out when not known */
+  position?: number
   candidates: Candidate[]
+}
+
+/** Just the fields of a consideration, for when `calling` may be a page row carrying more */
+export function consideration({ key, calling, member, organization, position }: Omit<Consideration, 'candidates'>, candidates: Candidate[]): Consideration {
+  return {
+    key,
+    calling,
+    member,
+    ...(organization ? { organization } : {}),
+    ...(position === undefined ? {} : { position }),
+    candidates,
+  }
 }

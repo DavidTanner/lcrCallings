@@ -8,7 +8,7 @@ import type { ExtensionApi } from './content/api'
 import type { Member } from './lcr/members'
 import { type CallingRow, enhancePage } from './page/enhance'
 import { shadowContainer } from './shadow'
-import type { Candidate, Consideration } from './shared/consideration'
+import { type Candidate, type Consideration, consideration } from './shared/consideration'
 import { spreadsheetUrl } from './shared/spreadsheet'
 import { useConsiderations } from './useConsiderations'
 
@@ -128,12 +128,7 @@ export function Tracker({ doc, api, spreadsheetId, initial, onChangeSheet }: Tra
     try {
       // let edits land first, so a row they add isn't added again
       await settle()
-      const added = await api.sync(spreadsheetId, rows.map(row => ({
-        key: row.key,
-        calling: row.calling,
-        member: row.member,
-        candidates: values[row.key] ?? NO_CANDIDATES,
-      })))
+      const added = await api.sync(spreadsheetId, rows.map(row => consideration(row, values[row.key] ?? NO_CANDIDATES)))
       setSynced(added
         ? `Added ${String(added)} ${added === 1 ? 'calling' : 'callings'} to the sheet.`
         : 'Every calling is already in the sheet.')

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { Candidate, Consideration } from './shared/consideration'
+import { type Candidate, type Consideration, consideration as toConsideration } from './shared/consideration'
 
 /** How long typing in notes pauses before they're saved */
 export const SAVE_DELAY_MS = 1000
@@ -60,8 +60,7 @@ export function useConsiderations(initial: Record<string, Candidate[]>, save: (c
   }, [write])
 
   const change = useCallback((calling: CallingInfo, candidates: Candidate[], debounce: boolean) => {
-    // just these, as `calling` may be a page row carrying more
-    const consideration = { key: calling.key, calling: calling.calling, member: calling.member, candidates }
+    const consideration = toConsideration(calling, candidates)
     setValues(current => ({ ...current, [calling.key]: candidates }))
     clearTimeout(pending.current.get(calling.key)?.timer)
     // a newer edit replaces one that failed

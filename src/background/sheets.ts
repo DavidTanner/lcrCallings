@@ -6,10 +6,17 @@ export const SHEET_TITLE = 'Considering'
  * Members are recorded by their LCR member uuid, never by name, since members
  * can share a name. Considering, Notes and Status are for people reading the
  * sheet; the extension reads candidates back from Data. Rows saved before Data
- * existed only have Considering, as free text.
+ * existed only have Considering, as free text. Organization and Position say
+ * where the calling is on the Organizations page, so it can be shown the same
+ * way away from it.
  */
-export const HEADER = ['Key', 'Calling', 'Held by', 'Considering', 'Updated', 'Notes', 'Data', 'Status']
-const LAST_COLUMN = 'H'
+export const HEADER = ['Key', 'Calling', 'Held by', 'Considering', 'Updated', 'Notes', 'Data', 'Status', 'Organization', 'Position']
+const LAST_COLUMN = 'J'
+/** Organization and Position */
+const PLACEMENT_COLUMNS = ['I', 'J'] as const
+
+/** Between the headings in the Organization column */
+export const ORGANIZATION_SEPARATOR = ' > '
 
 /**
  * Title of the tab the extension copies the unit's members into, so pages
@@ -61,16 +68,20 @@ export function createSheetsClient(tokens: TokenProvider, fetchFn: (url: string,
   }
 
   const range = (id: string, a1: string, tab = SHEET_TITLE) => `${encodeURIComponent(id)}/values/${encodeURIComponent(`'${tab}'!${a1}`)}`
-  const row = ({ key, calling, member, candidates }: Consideration) => [
-    key,
-    calling,
-    member,
-    candidates.map(c => c.id).join('\n'),
-    new Date().toISOString(),
-    candidates.filter(c => c.notes).map(c => `${c.id}: ${c.notes}`).join('\n'),
-    candidates.length ? JSON.stringify(candidates) : '',
-    candidates.filter(c => c.status).map(c => `${c.id}: ${c.status ?? ''}`).join('\n'),
-  ]
+  const row = (consideration: Consideration) => {
+    const { key, calling, member, candidates } = consideration
+    return [
+      key,
+      calling,
+      member,
+      candidates.map(c => c.id).join('\n'),
+      new Date().toISOString(),
+      candidates.filter(c => c.notes).map(c => `${c.id}: ${c.notes}`).join('\n'),
+      candidates.length ? JSON.stringify(candidates) : '',
+      candidates.filter(c => c.status).map(c => `${c.id}: ${c.status ?? ''}`).join('\n'),
+      ...placement(consideration),
+    ]
+  }
   const append = (id: string, considerations: Consideration[]) =>
     request(`${range(id, `A:${LAST_COLUMN}`)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`, {
       method: 'POST',
@@ -125,7 +136,7 @@ export function createSheetsClient(tokens: TokenProvider, fetchFn: (url: string,
     const rows = new Map<string, Consideration>()
     for (const row of values) {
       const [key = '', calling = '', member = ''] = row
-      if (key) rows.set(key, { key, calling, member, candidates: candidatesIn(row) })
+      if (key) rows.set(key, { key, calling, member, ...placementIn(row), candidates: candidatesIn(row) })
     }
     return [...rows.values()]
   }
@@ -174,16 +185,58 @@ export function createSheetsClient(tokens: TokenProvider, fetchFn: (url: string,
 
     /**
      * Appends a row, in one request, for each consideration whose key isn't in
-     * the sheet yet. Rows already there are left alone, so edits others made
-     * aren't overwritten. Returns how many rows were added.
+     * the sheet yet. Of rows already there, only Organization and Position are
+     * brought up to date, so edits others made aren't overwritten. Returns how
+     * many rows were added.
      */
     async sync(id: string, considerations: Consideration[]): Promise<number> {
       await ensureSheet(id)
-      const existing = new Set(await keys(id))
-      const missing = considerations.filter(c => !existing.has(c.key))
+      const { values = [] } = await request<{ values?: string[][] }>(range(id, `A:${LAST_COLUMN}`))
+      /** where each key's row is, and where it says the calling is; the last row wins, as in `save` */
+      const existing = new Map<string, { index: number, placement: string }>()
+      values.forEach((row, index) => {
+        const [key = '', , , , , , , , organization = '', position = ''] = row
+        if (index > 0 && key) existing.set(key, { index, placement: [organization, position].join('\t') })
+      })
+
+      const missing: Consideration[] = []
+      const moved: { range: string, values: (string | number)[][] }[] = []
+      for (const c of considerations) {
+        const found = existing.get(c.key)
+        if (!found) {
+          missing.push(c)
+          continue
+        }
+        const cells = placement(c)
+        if (c.organization && cells.map(String).join('\t') !== found.placement) {
+          const n = String(found.index + 1)
+          moved.push({ range: `'${SHEET_TITLE}'!${PLACEMENT_COLUMNS[0]}${n}:${PLACEMENT_COLUMNS[1]}${n}`, values: [cells] })
+        }
+      }
+      if (moved.length) {
+        await request(`${encodeURIComponent(id)}/values:batchUpdate`, {
+          method: 'POST',
+          body: JSON.stringify({ valueInputOption: 'RAW', data: moved }),
+        })
+      }
       if (missing.length) await append(id, missing)
       return missing.length
     },
+  }
+}
+
+/** The Organization and Position cells for a row */
+function placement({ organization, position }: Pick<Consideration, 'organization' | 'position'>): (string | number)[] {
+  return [organization?.join(ORGANIZATION_SEPARATOR) ?? '', position ?? '']
+}
+
+/** Where a row says its calling is on the Organizations page, leaving out what it doesn't say */
+export function placementIn([, , , , , , , , organization = '', position = '']: string[]): Pick<Consideration, 'organization' | 'position'> {
+  const headings = organization.split(ORGANIZATION_SEPARATOR).map(h => h.trim()).filter(Boolean)
+  const at = position.trim() ? Number(position) : NaN
+  return {
+    ...(headings.length ? { organization: headings } : {}),
+    ...(Number.isInteger(at) && at >= 0 ? { position: at } : {}),
   }
 }
 

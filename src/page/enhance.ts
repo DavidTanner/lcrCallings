@@ -21,6 +21,10 @@ export interface CallingRow {
   calling: string
   /** member uuid of whoever holds the calling now, '' when vacant */
   member: string
+  /** the headings the row's table is under, outermost first, e.g. `['Elders Quorum', 'Teachers']` */
+  organization: string[]
+  /** where the row is on the page, from 0 */
+  position: number
   /** element in the added cell to render the row's field into */
   slot: HTMLElement
 }
@@ -48,6 +52,26 @@ function addedCell(template: Element, tag: 'td' | 'th', title: string) {
   cardLabel.textContent = title
   cell.append(cardLabel)
   return cell
+}
+
+/**
+ * The headings each calling table is under, outermost first. LCR heads each
+ * organization with an h2 and the groups within it with h3s and h4s, not
+ * always nested in their own elements, so this goes by document order.
+ */
+function tableOrganizations(doc: Document) {
+  const organizations = new Map<Element, string[]>()
+  const headings: string[] = []
+  for (const el of doc.querySelectorAll('h2, h3, h4, h5, h6, table')) {
+    if (el.tagName === 'TABLE') {
+      organizations.set(el, headings.filter(Boolean))
+      continue
+    }
+    const level = Number(el.tagName.slice(1)) - 2
+    headings.length = level
+    headings[level] = el.textContent.trim()
+  }
+  return organizations
 }
 
 export interface Enhancement {
@@ -81,6 +105,7 @@ export function enhancePage(doc: Document, onApply?: (rows: CallingRow[]) => voi
     // The same calling and person can appear more than once (e.g. the bishop
     // is also over the Aaronic Priesthood), so count repeats to keep keys unique
     const seen = new Map<string, number>()
+    const organizations = tableOrganizations(doc)
     const found: CallingRow[] = []
     for (const tr of doc.querySelectorAll('tbody tr')) {
       const callingCell = cellLabelled(tr, 'Calling')
@@ -103,10 +128,15 @@ export function enhancePage(doc: Document, onApply?: (rows: CallingRow[]) => voi
         slot.setAttribute(SLOT, key)
         cell.append(slot)
         name.after(cell)
-        rowFor.set(cell, { key, calling, member, slot })
+        rowFor.set(cell, { key, calling, member, organization: [], position: 0, slot })
       }
       const row = rowFor.get(cell)
-      if (row) found.push(row)
+      if (row) {
+        // kept up to date on the same object, in case rows are added above it
+        row.organization = organizations.get(tr.closest('table') ?? tr) ?? []
+        row.position = found.length
+        found.push(row)
+      }
     }
     rows = found
     onApply?.(rows)
