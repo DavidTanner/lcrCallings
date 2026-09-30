@@ -14,6 +14,8 @@ export interface WebAppProps {
   spreadsheetId?: string
   /** remembers the sheet someone picked */
   onSpreadsheetId: (id: string | undefined) => void
+  /** this page's address, to share links to it */
+  pageUrl: string
 }
 
 type State
@@ -25,7 +27,7 @@ type State
 const message = (error: unknown) => error instanceof Error ? error.message : String(error)
 
 /** The page for people who can't install the extension: the sheet's callings, editable */
-export function WebApp({ auth, api, spreadsheetId: initialId, onSpreadsheetId }: WebAppProps) {
+export function WebApp({ auth, api, spreadsheetId: initialId, onSpreadsheetId, pageUrl }: WebAppProps) {
   const [spreadsheetId, setSpreadsheetId] = useState(initialId)
   const [state, setState] = useState<State>(() => auth.isSignedIn() ? { step: 'loading' } : { step: 'signIn' })
 
@@ -121,7 +123,7 @@ export function WebApp({ auth, api, spreadsheetId: initialId, onSpreadsheetId }:
         )
         break
       case 'ready':
-        body = <Board api={api} spreadsheetId={spreadsheetId} rows={state.rows} members={state.members} ensureSignedIn={ensureSignedIn} />
+        body = <Board api={api} spreadsheetId={spreadsheetId} rows={state.rows} members={state.members} pageUrl={pageUrl} ensureSignedIn={ensureSignedIn} />
         break
     }
   }

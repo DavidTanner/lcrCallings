@@ -3,6 +3,9 @@ import { HOST_ID } from '../constants'
 import { mount, type Unmount } from '../mount'
 import { chromeApi } from './api'
 
+// set when building, from the environment (see scripts/build.ts)
+const WEB_URL = process.env.WEB_URL || undefined
+
 declare global {
   var callingsContentScript: boolean | undefined
 }
@@ -21,7 +24,7 @@ if (!globalThis.callingsContentScript) {
       unmount = undefined
     }
     else {
-      unmount = mount(document, chromeApi)
+      unmount = mount(document, chromeApi, WEB_URL)
     }
   })
 }

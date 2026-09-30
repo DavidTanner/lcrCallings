@@ -2,8 +2,6 @@ import { createHash } from 'node:crypto'
 import { APP_NAME } from '../src/constants'
 
 export const LCR_MATCH = 'https://lcr.churchofjesuschrist.org/*'
-/** where `npm run dev` serves the saved demo page */
-export const DEV_MATCH = 'http://127.0.0.1:8000/*'
 
 export interface ManifestOptions {
   version: string
@@ -17,7 +15,7 @@ export interface ManifestOptions {
 }
 
 export function buildManifest({ version, description, clientId, key, dev }: ManifestOptions): chrome.runtime.ManifestV3 {
-  const matches = dev ? [LCR_MATCH, DEV_MATCH] : [LCR_MATCH]
+  const matches = [LCR_MATCH]
   return {
     manifest_version: 3,
     name: dev ? `${APP_NAME} (dev)` : APP_NAME,

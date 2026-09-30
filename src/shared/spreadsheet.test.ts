@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { parseSpreadsheetId } from './spreadsheet'
+import { parseSpreadsheetId, webPageLink } from './spreadsheet'
 
 const ID = '1AbC-dEf_ghIJklMNopQRstuVWxyz0123456789'
 
@@ -16,5 +16,15 @@ describe('parseSpreadsheetId', () => {
   it('rejects anything else', () => {
     assert.equal(parseSpreadsheetId('https://example.com/sheet'), undefined)
     assert.equal(parseSpreadsheetId(''), undefined)
+  })
+})
+
+describe('webPageLink', () => {
+  it('links to the web page with the sheet in it', () => {
+    assert.equal(webPageLink('https://example.gitlab.io/callings/', ID), `https://example.gitlab.io/callings/?sheet=${ID}`)
+  })
+
+  it('replaces the sheet already in the link, and keeps the rest', () => {
+    assert.equal(webPageLink('https://example.gitlab.io/callings/?sheet=old&x=1#top', ID), `https://example.gitlab.io/callings/?sheet=${ID}&x=1`)
   })
 })

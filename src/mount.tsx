@@ -12,8 +12,9 @@ export type Unmount = () => void
 /**
  * Renders the panel inside a shadow root attached to a fixed-position host
  * element, so the host page's CSS can't leak in and Mantine's can't leak out.
+ * `webUrl` is where the web page is, to share links to it.
  */
-export function mount(doc: Document, api: ExtensionApi): Unmount {
+export function mount(doc: Document, api: ExtensionApi, webUrl?: string): Unmount {
   const host = doc.createElement('div')
   host.id = HOST_ID
   Object.assign(host.style, {
@@ -56,7 +57,7 @@ export function mount(doc: Document, api: ExtensionApi): Unmount {
           },
         }}
       >
-        <App doc={doc} api={api} onClose={unmount} />
+        <App doc={doc} api={api} onClose={unmount} webUrl={webUrl} />
       </MantineProvider>
     </StrictMode>,
   )

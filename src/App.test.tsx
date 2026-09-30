@@ -2,6 +2,7 @@ import { MantineProvider } from '@mantine/core'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import assert from 'node:assert/strict'
 import { afterEach, beforeEach, describe, it, mock } from 'node:test'
+import { fakeClipboard } from '../test/clipboard'
 import { fakeApi, MEMBERS, orgTable } from '../test/fixtures'
 import { App } from './App'
 import { LAYER_ID } from './constants'
@@ -31,9 +32,9 @@ async function pick(calling: string, name: string) {
   })
 }
 
-const renderApp = (api: ReturnType<typeof fakeApi>, onClose = () => undefined) => render(
+const renderApp = (api: ReturnType<typeof fakeApi>, onClose = () => undefined, webUrl?: string) => render(
   <MantineProvider env="test">
-    <App doc={document} api={api} onClose={onClose} />
+    <App doc={document} api={api} onClose={onClose} webUrl={webUrl} />
   </MantineProvider>,
 )
 
@@ -249,6 +250,29 @@ describe('App', () => {
       await Promise.resolve()
     })
     assert.ok(await screen.findByText('Couldn\'t sync: Quota exceeded'))
+  })
+
+  it('copies a link to the web page that opens the sheet', async () => {
+    const clipboard = fakeClipboard()
+    try {
+      renderApp(fakeApi({ spreadsheetId: SHEET_ID }), undefined, 'https://example.gitlab.io/callings/')
+      await screen.findByText(/Tracking/)
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Copy link' }))
+        await Promise.resolve()
+      })
+      assert.deepEqual(clipboard.copied, [`https://example.gitlab.io/callings/?sheet=${SHEET_ID}`])
+      assert.ok(screen.getByRole('button', { name: 'Link copied' }))
+    }
+    finally {
+      clipboard.restore()
+    }
+  })
+
+  it('has no link to share when built without the web page\'s address', async () => {
+    renderApp(fakeApi({ spreadsheetId: SHEET_ID }))
+    await screen.findByText(/Tracking/)
+    assert.equal(screen.queryByRole('button', { name: 'Copy link' }), null)
   })
 
   it('lets the user retry when the sheet cannot be opened', async () => {

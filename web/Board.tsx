@@ -2,6 +2,7 @@ import { Alert, Anchor, Badge, Button, Group, Paper, SegmentedControl, SimpleGri
 import { useCallback, useMemo, useState } from 'react'
 import type { SheetMember, SheetsClient } from '../src/background/sheets'
 import { CandidatesField, candidateName } from '../src/CandidatesField'
+import { ShareLinkButton } from '../src/ShareLinkButton'
 import type { Candidate, Consideration } from '../src/shared/consideration'
 import { spreadsheetUrl } from '../src/shared/spreadsheet'
 import { type CallingInfo, useConsiderations } from '../src/useConsiderations'
@@ -22,12 +23,14 @@ export interface BoardProps {
   spreadsheetId: string
   rows: Consideration[]
   members: SheetMember[]
+  /** this page's address, to share links to it */
+  pageUrl: string
   /** Makes sure there's a Google token, signing in if needed; call it from a tap */
   ensureSignedIn: () => Promise<void>
 }
 
 /** Every calling in the sheet, with who is being considered for each, saving edits to the sheet */
-export function Board({ api, spreadsheetId, rows: initialRows, members: initialMembers, ensureSignedIn }: BoardProps) {
+export function Board({ api, spreadsheetId, rows: initialRows, members: initialMembers, pageUrl, ensureSignedIn }: BoardProps) {
   const [callings, setCallings] = useState<CallingInfo[]>(initialRows)
   const [members, setMembers] = useState(initialMembers)
   const [search, setSearch] = useState('')
@@ -99,7 +102,10 @@ export function Board({ api, spreadsheetId, rows: initialRows, members: initialM
           {' · '}
           {saving ? 'Saving…' : unsaved ? `${String(unsaved)} not saved` : 'All changes saved'}
         </Text>
-        <Button size="sm" variant="default" loading={refreshing} onClick={() => void refresh()}>Refresh</Button>
+        <Group gap="xs">
+          <ShareLinkButton size="sm" pageUrl={pageUrl} spreadsheetId={spreadsheetId} />
+          <Button size="sm" variant="default" loading={refreshing} onClick={() => void refresh()}>Refresh</Button>
+        </Group>
       </Group>
 
       {error && (

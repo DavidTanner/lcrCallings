@@ -73,7 +73,7 @@ function Root() {
   if (!CLIENT_ID) return <Alert color="red" m="md" title="Not set up">This page was built without WEB_OAUTH_CLIENT_ID. See the README.</Alert>
   if (error) return <Alert color="red" m="md">{error}</Alert>
   if (!google) return <Center h="100vh"><Loader /></Center>
-  return <WebApp auth={google.auth} api={google.api} spreadsheetId={spreadsheetId} onSpreadsheetId={saveSpreadsheetId} />
+  return <WebApp auth={google.auth} api={google.api} spreadsheetId={spreadsheetId} onSpreadsheetId={saveSpreadsheetId} pageUrl={location.href} />
 }
 
 const style = document.createElement('style')

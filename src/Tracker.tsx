@@ -8,6 +8,7 @@ import type { ExtensionApi } from './content/api'
 import type { Member } from './lcr/members'
 import { type CallingRow, enhancePage } from './page/enhance'
 import { shadowContainer } from './shadow'
+import { ShareLinkButton } from './ShareLinkButton'
 import { type Candidate, type Consideration, consideration } from './shared/consideration'
 import { spreadsheetUrl } from './shared/spreadsheet'
 import { useConsiderations } from './useConsiderations'
@@ -49,11 +50,13 @@ export interface TrackerProps {
   api: ExtensionApi
   spreadsheetId: string
   initial: Record<string, Candidate[]>
+  /** where the web page is, to share links to it */
+  webUrl?: string
   onChangeSheet: () => void
 }
 
 /** Adds the column to the page while mounted, saving edits to the sheet */
-export function Tracker({ doc, api, spreadsheetId, initial, onChangeSheet }: TrackerProps) {
+export function Tracker({ doc, api, spreadsheetId, initial, webUrl, onChangeSheet }: TrackerProps) {
   const [rows, setRows] = useState<CallingRow[]>([])
   const [members, setMembers] = useState<Member[]>()
   const [membersError, setMembersError] = useState<string>()
@@ -165,6 +168,7 @@ export function Tracker({ doc, api, spreadsheetId, initial, onChangeSheet }: Tra
       <Group gap="xs">
         <Button size="xs" variant="default" loading={refreshing} onClick={() => void refresh()}>Refresh</Button>
         <Button size="xs" variant="default" loading={syncing} disabled={!rows.length} onClick={() => void syncAll()}>Sync all callings</Button>
+        {webUrl && <ShareLinkButton pageUrl={webUrl} spreadsheetId={spreadsheetId} />}
         <Button size="xs" variant="subtle" onClick={onChangeSheet}>Change sheet</Button>
       </Group>
       {rows.map(row => createPortal(

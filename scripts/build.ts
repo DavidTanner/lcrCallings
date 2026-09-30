@@ -8,10 +8,11 @@ const dev = process.argv.includes('--dev')
 
 const outdir = 'dist'
 
-// OAUTH_CLIENT_ID and EXTENSION_KEY can live in .env (git-ignored)
+// OAUTH_CLIENT_ID, EXTENSION_KEY and WEB_URL can live in .env (git-ignored)
 if (existsSync('.env')) process.loadEnvFile('.env')
-const { OAUTH_CLIENT_ID: clientId, EXTENSION_KEY: key } = process.env
+const { OAUTH_CLIENT_ID: clientId, EXTENSION_KEY: key, WEB_URL: webUrl = '' } = process.env
 if (!clientId) console.warn('OAUTH_CLIENT_ID is not set, so Google sign-in won\'t work. See README.md.')
+if (webUrl && !URL.canParse(webUrl)) throw new Error(`WEB_URL isn't a URL: ${webUrl}`)
 
 const common: esbuild.BuildOptions = {
   bundle: true,
@@ -21,7 +22,10 @@ const common: esbuild.BuildOptions = {
   sourcemap: false,
   legalComments: 'none',
   logLevel: 'info',
-  define: { 'process.env.NODE_ENV': JSON.stringify('production') },
+  define: {
+    'process.env.NODE_ENV': JSON.stringify('production'),
+    'process.env.WEB_URL': JSON.stringify(webUrl),
+  },
 }
 
 const builds: esbuild.BuildOptions[] = [

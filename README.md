@@ -22,6 +22,9 @@ Built with React, Mantine, TypeScript 6 and esbuild.
    someone has picked candidates for. Rows already in the sheet are left as
    they are, except for their Organization and Position, which are brought up
    to date.
+5. **Copy link** copies a link to the [web page](#web-page) that opens the
+   same sheet, to send to people who can't use the extension. It only shows
+   if the extension was built with `WEB_URL`.
 
 Members come from LCR's Member List page (`/mlt/records/member-list`),
 fetched with your LCR session. Each time the panel opens, the extension also
@@ -94,6 +97,9 @@ last, under **Not grouped yet**, until someone presses **Sync all callings**.
 Open it with `?sheet=<link or id>` to pick the sheet, e.g.
 `https://<you>.gitlab.io/callings/?sheet=https://docs.google.com/spreadsheets/d/…`,
 or paste the sheet's link the first time it opens. It's remembered after that.
+**Copy link**, on the page or in the extension's panel, copies a link like
+that for the sheet that's open. If the browser won't copy it, the link shows
+in a box to copy by hand.
 
 To set it up:
 
@@ -108,6 +114,8 @@ To set it up:
    in the page.
 3. Push to the default branch. `.gitlab-ci.yml` runs the checks and publishes
    `public/` to GitLab Pages.
+4. Add the page's address to `.env` as `WEB_URL=https://<you>.gitlab.io/callings/`
+   and rebuild the extension, so its panel can share links to the page.
 
 Google's tokens last an hour. When one runs out the page keeps unsaved edits
 and shows **Save again**, which signs in again and saves them.

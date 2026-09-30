@@ -3,12 +3,14 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import assert from 'node:assert/strict'
 import { afterEach, describe, it } from 'node:test'
 import type { SheetMember } from '../src/background/sheets'
+import { fakeClipboard } from '../test/clipboard'
 import type { Consideration } from '../src/shared/consideration'
 import { WebApp } from './App'
 import type { WebApi } from './Board'
 import { type GoogleAuth, SignInRequired } from './google'
 
 const SHEET_ID = '1AbC-dEf_ghIJklMNopQRstuVWxyz0123456789'
+const PAGE_URL = 'https://example.gitlab.io/callings/'
 
 const MEMBERS: SheetMember[] = [
   { uuid: 'm1', name: 'Abel, Bea' },
@@ -72,7 +74,7 @@ interface RenderOptions {
 
 const renderApp = (auth: GoogleAuth, api: WebApi, { spreadsheetId, onSpreadsheetId = () => undefined }: RenderOptions = { spreadsheetId: SHEET_ID }) => render(
   <MantineProvider env="test">
-    <WebApp auth={auth} api={api} spreadsheetId={spreadsheetId} onSpreadsheetId={onSpreadsheetId} />
+    <WebApp auth={auth} api={api} spreadsheetId={spreadsheetId} onSpreadsheetId={onSpreadsheetId} pageUrl={PAGE_URL} />
   </MantineProvider>,
 )
 
@@ -205,6 +207,33 @@ describe('WebApp', () => {
     await click(screen.getByRole('button', { name: 'Save again' }))
     assert.equal(auth.signIns, 1)
     assert.deepEqual(api.saved.map(c => c.candidates[0]?.notes), ['Ask in May'])
+  })
+
+  it('copies a link to this page that opens the sheet', async () => {
+    const clipboard = fakeClipboard()
+    try {
+      const auth = fakeAuth(true)
+      renderApp(auth, fakeApi(auth))
+      await click(await screen.findByRole('button', { name: 'Copy link' }))
+      assert.deepEqual(clipboard.copied, [`${PAGE_URL}?sheet=${SHEET_ID}`])
+      assert.ok(screen.getByRole('button', { name: 'Link copied' }))
+    }
+    finally {
+      clipboard.restore()
+    }
+  })
+
+  it('shows the link when it can\'t be copied', async () => {
+    const clipboard = fakeClipboard({ fail: true })
+    try {
+      const auth = fakeAuth(true)
+      renderApp(auth, fakeApi(auth))
+      await click(await screen.findByRole('button', { name: 'Copy link' }))
+      assert.equal((await screen.findByLabelText<HTMLInputElement>('Copy this link')).value, `${PAGE_URL}?sheet=${SHEET_ID}`)
+    }
+    finally {
+      clipboard.restore()
+    }
   })
 
   it('says when the extension hasn\'t copied member names to the sheet yet', async () => {

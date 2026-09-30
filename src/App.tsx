@@ -12,6 +12,8 @@ export interface AppProps {
   doc: Document
   api: ExtensionApi
   onClose: () => void
+  /** where the web page is, to share links to it; no link without it */
+  webUrl?: string
 }
 
 type State
@@ -23,7 +25,7 @@ type State
 
 const message = (error: unknown) => error instanceof Error ? error.message : String(error)
 
-export function App({ doc, api, onClose }: AppProps) {
+export function App({ doc, api, onClose, webUrl }: AppProps) {
   const [state, setState] = useState<State>({ step: 'starting' })
 
   const connect = useCallback(async (spreadsheetId: string) => {
@@ -75,7 +77,7 @@ export function App({ doc, api, onClose }: AppProps) {
       )
       break
     case 'ready':
-      body = <Tracker doc={doc} api={api} spreadsheetId={state.spreadsheetId} initial={state.values} onChangeSheet={changeSheet} />
+      body = <Tracker doc={doc} api={api} spreadsheetId={state.spreadsheetId} initial={state.values} webUrl={webUrl} onChangeSheet={changeSheet} />
       break
   }
 
