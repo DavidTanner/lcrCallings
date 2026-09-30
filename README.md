@@ -95,7 +95,7 @@ doesn't have an Organization for yet (rows from before it was recorded) show
 last, under **Not grouped yet**, until someone presses **Sync all callings**.
 
 Open it with `?sheet=<link or id>` to pick the sheet, e.g.
-`https://<you>.gitlab.io/callings/?sheet=https://docs.google.com/spreadsheets/d/…`,
+`https://davidtanner.github.io/lcrCallings/?sheet=https://docs.google.com/spreadsheets/d/…`,
 or paste the sheet's link the first time it opens. It's remembered after that.
 **Copy link**, on the page or in the extension's panel, copies a link like
 that for the sheet that's open. If the browser won't copy it, the link shows
@@ -104,17 +104,21 @@ in a box to copy by hand.
 To set it up:
 
 1. In the same Google Cloud project, create another **OAuth client ID**, of
-   type **Web application**, with the page's origin (e.g.
-   `https://<you>.gitlab.io`, and `http://127.0.0.1:8002` for `npm run web`)
-   under **Authorized JavaScript origins**. Everyone using it still needs to
-   be a test user on the consent screen.
-2. On GitLab, add its client id as a CI/CD variable `WEB_OAUTH_CLIENT_ID`
-   (Settings → CI/CD → Variables), and optionally `SPREADSHEET_ID` so the
-   page opens that sheet without being told. Neither is secret: they end up
-   in the page.
-3. Push to the default branch. `.gitlab-ci.yml` runs the checks and publishes
-   `public/` to GitLab Pages.
-4. Add the page's address to `.env` as `WEB_URL=https://<you>.gitlab.io/callings/`
+   type **Web application**, with the page's origin (`https://davidtanner.github.io`,
+   with no path, and `http://127.0.0.1:8002` for `npm run web`) under
+   **Authorized JavaScript origins**. Everyone using it still needs to be a
+   test user on the consent screen.
+2. On GitHub, add its client id as a repository variable `WEB_OAUTH_CLIENT_ID`
+   (Settings → Secrets and variables → Actions → **Variables**), and
+   optionally `SPREADSHEET_ID` so the page opens that sheet without being
+   told. Neither is secret: they end up in the page.
+3. Under Settings → Pages, set **Source** to **GitHub Actions**.
+4. Push to `main`. `.github/workflows/ci.yml` runs the checks, then
+   `npm run pages:build` builds the page into `public/` and the
+   [demo](#demo) into `public/demo/`, and publishes them to GitHub Pages at
+   https://davidtanner.github.io/lcrCallings/ and
+   https://davidtanner.github.io/lcrCallings/demo/.
+5. Add the page's address to `.env` as `WEB_URL=https://davidtanner.github.io/lcrCallings/`
    and rebuild the extension, so its panel can share links to the page.
 
 Google's tokens last an hour. When one runs out the page keeps unsaved edits
@@ -127,9 +131,12 @@ and shows **Save again**, which signs in again and saves them.
 | `npm run build`     | Builds the extension into `dist/`                                        |
 | `npm run dev`       | Rebuilds `dist/` on change (reload the extension in `chrome://extensions` to pick it up). If `resources/existingCallingsPage.html` exists it's served at http://127.0.0.1:8000/demo.html, where the dev build also runs, and `resources/mltRecordsMemberList.txt` answers its member list requests |
 | `npm run demo`      | Serves a mock Organizations page at http://127.0.0.1:8001/ that runs the panel without Chrome, Google or real member data (see [Demo](#demo)) |
+| `npm run demo:build` | Builds the demo into `public/demo/`, after `web:build` (which empties `public/`) |
+| `npm run demo:sheet` | Writes the demo ward to `demo/sheet/` as CSV files to import into a Google Sheet (see [Demo sheet](#demo-sheet)) |
 | `npm run keygen`    | Adds a key pinning the extension id to `.env`                            |
 | `npm run web`       | Serves the [web page](#web-page) at http://127.0.0.1:8002/, rebuilding on each load (needs `WEB_OAUTH_CLIENT_ID` in `.env`) |
 | `npm run web:build` | Builds the web page into `public/`                                       |
+| `npm run pages:build` | Builds the web page and the demo into `public/`, as published to GitHub Pages |
 | `npm run members -- [file]` | Prints the members in a saved LCR page payload as JSON (default `resources/mltRecordsMemberList.txt`) |
 | `npm test`          | Runs `node:test` over `src/**/*.test.{ts,tsx}` and `scripts/**/*.test.ts` |
 | `npm run lint`      | ESLint (typescript-eslint strict + `@stylistic`, no semicolons)           |
@@ -146,6 +153,26 @@ browser's `localStorage`, starting with a few callings already being
 considered, and whose members are made up (`demo/data.ts`). Nothing is sent
 anywhere, so it's safe to show or share. **Reset demo** puts the sheet back;
 `?open` opens the panel on load.
+It's published at https://davidtanner.github.io/lcrCallings/demo/ along
+with the [web page](#web-page).
+
+### Demo sheet
+
+To try the [web page](#web-page) against a real Google Sheet without real
+member data, `demo/sheet/` has the same made-up ward as one CSV file per tab:
+`Considering.csv` (every calling, already synced, with the demo's candidates)
+and `Members.csv`. To set up a sheet from them:
+
+1. Create a blank Google Sheet.
+2. **File → Import → Upload**, pick `Considering.csv`, choose **Insert new
+   sheet(s)** and **Import data**. Google names the tab after the file, which
+   is the name the page looks for.
+3. Do the same for `Members.csv`, then delete the empty `Sheet1` if you like.
+4. Share the sheet with whoever will try it, and open the web page with
+   `?sheet=<the sheet's link>`.
+
+`npm run demo:sheet` rewrites the files from `demo/data.ts`; a test fails if
+they're out of date.
 
 ## How it works
 

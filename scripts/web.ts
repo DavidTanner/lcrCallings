@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs'
 import { copyFile, mkdir, rm } from 'node:fs/promises'
 
 // Builds web/, a page for people who can't install the extension (e.g. on an
-// iPad), into public/ for GitLab Pages. `--serve` serves it on 127.0.0.1
+// iPad), into public/ for GitHub Pages. `--serve` serves it on 127.0.0.1
 // instead, rebuilding on each page load.
 const serve = process.argv.includes('--serve')
 const outdir = 'public'
@@ -50,5 +50,5 @@ if (serve) {
 }
 else {
   await esbuild.build(options)
-  console.log(`Built ${outdir}/. Host it on GitLab Pages (see .gitlab-ci.yml) or any static host.`)
+  console.log(`Built ${outdir}/. Host it on GitHub Pages (see .github/workflows/ci.yml) or any static host.`)
 }

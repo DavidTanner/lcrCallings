@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { generateKeyPairSync } from 'node:crypto'
 import { describe, it } from 'node:test'
-import { buildManifest, DEV_MATCH, extensionId, LCR_MATCH } from './manifest'
+import { buildManifest, extensionId, LCR_MATCH } from './manifest'
 
 describe('buildManifest', () => {
   it('runs on LCR and can reach Google Sheets', () => {
@@ -16,7 +16,7 @@ describe('buildManifest', () => {
 
   it('also runs on the demo page in dev', () => {
     const manifest = buildManifest({ version: '1', description: 'd', dev: true })
-    assert.deepEqual(manifest.content_scripts?.[0]?.matches, [LCR_MATCH, DEV_MATCH])
+    assert.deepEqual(manifest.content_scripts?.[0]?.matches, [LCR_MATCH])
     assert.equal(manifest.oauth2, undefined)
   })
 })
