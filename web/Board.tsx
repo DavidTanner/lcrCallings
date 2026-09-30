@@ -1,10 +1,11 @@
-import { Alert, Anchor, Badge, Button, Group, Paper, SegmentedControl, Select, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core'
+import { Alert, Anchor, Badge, Button, Group, Paper, SegmentedControl, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core'
 import { useCallback, useMemo, useState } from 'react'
 import type { SheetMember, SheetsClient } from '../src/background/sheets'
 import { CandidatesField, candidateName } from '../src/CandidatesField'
 import type { Candidate, Consideration } from '../src/shared/consideration'
 import { spreadsheetUrl } from '../src/shared/spreadsheet'
 import { type CallingInfo, useConsiderations } from '../src/useConsiderations'
+import { OrganizationPicker } from './OrganizationPicker'
 import { byOrganization, UNGROUPED } from './organizations'
 
 /** What the page needs from Google Sheets, so it can be tested without Google */
@@ -31,8 +32,8 @@ export function Board({ api, spreadsheetId, rows: initialRows, members: initialM
   const [members, setMembers] = useState(initialMembers)
   const [search, setSearch] = useState('')
   const [show, setShow] = useState<Show>('all')
-  /** the one organization to show, or all of them */
-  const [organization, setOrganization] = useState<string | null>(null)
+  /** organizations taken out of view; any not in it, including new ones, are shown */
+  const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set())
   const [refreshing, setRefreshing] = useState(false)
 
   const initial = useMemo(() => Object.fromEntries(initialRows.map(r => [r.key, r.candidates])), [initialRows])
@@ -85,7 +86,7 @@ export function Board({ api, spreadsheetId, rows: initialRows, members: initialM
     return text.some(t => t.toLowerCase().includes(query))
   }
   const shown = organizations
-    .filter(o => !organization || o.name === organization)
+    .filter(o => !hidden.has(o.name))
     .map(o => ({ ...o, groups: o.groups.map(g => ({ ...g, rows: g.rows.filter(matches) })).filter(g => g.rows.length) }))
     .filter(o => o.groups.length)
 
@@ -132,16 +133,7 @@ export function Board({ api, spreadsheetId, rows: initialRows, members: initialM
               setSearch(event.currentTarget.value)
             }}
           />
-          <Select
-            size="md"
-            placeholder="All organizations"
-            aria-label="Organization"
-            data={organizationNames}
-            value={organization && organizationNames.includes(organization) ? organization : null}
-            onChange={setOrganization}
-            clearable
-            searchable
-          />
+          <OrganizationPicker organizations={organizationNames} hidden={hidden} onChange={setHidden} />
         </SimpleGrid>
         <SegmentedControl
           fullWidth
@@ -199,7 +191,11 @@ export function Board({ api, spreadsheetId, rows: initialRows, members: initialM
           ))}
         </Stack>
       ))}
-      {callings.length > 0 && !shown.length && <Text c="dimmed" ta="center">Nothing matches.</Text>}
+      {callings.length > 0 && !shown.length && (
+        <Text c="dimmed" ta="center">
+          {organizationNames.every(name => hidden.has(name)) ? 'No organizations picked.' : 'Nothing matches.'}
+        </Text>
+      )}
     </Stack>
   )
 }

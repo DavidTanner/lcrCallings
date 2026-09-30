@@ -136,7 +136,7 @@ describe('WebApp', () => {
     assert.ok(screen.getByText('Ward Clerk'))
   })
 
-  it('groups callings by organization, and shows one organization at a time', async () => {
+  it('groups callings by organization, and adds or removes organizations from view', async () => {
     const auth = fakeAuth(true)
     const rows: Consideration[] = [
       { key: 'EQ Teacher|vacant|0', calling: 'Elders Quorum Teacher', member: '', organization: ['Elders Quorum', 'Teachers'], position: 2, candidates: [] },
@@ -145,19 +145,36 @@ describe('WebApp', () => {
     ]
     renderApp(auth, fakeApi(auth, rows))
     await screen.findByText('Bishop')
-    const headings = screen.getAllByRole('heading').filter(h => ['H2', 'H3'].includes(h.tagName)).map(h => h.textContent)
-    assert.deepEqual(headings, ['Bishopric', 'Elders Quorum', 'Teachers', 'Not grouped yet'])
+    const headings = () => screen.queryAllByRole('heading').filter(h => h.tagName === 'H2').map(h => h.textContent)
+    assert.deepEqual(screen.getAllByRole('heading').filter(h => ['H2', 'H3'].includes(h.tagName)).map(h => h.textContent), ['Bishopric', 'Elders Quorum', 'Teachers', 'Not grouped yet'])
     assert.ok(within(screen.getByRole('region', { name: 'Bishopric' })).getByText('Ward Clerk'))
 
-    const select = screen.getByRole<HTMLInputElement>('combobox', { name: 'Organization' })
-    fireEvent.click(select)
-    await click(await screen.findByRole('option', { name: 'Elders Quorum' }))
-    assert.equal(select.value, 'Elders Quorum')
-    assert.equal(screen.queryByText('Bishop'), null)
-    assert.ok(screen.getByText('Elders Quorum Teacher'))
+    await click(screen.getByRole('button', { name: 'Organizations: All organizations' }))
+    const option = (name: string) => screen.getByRole('option', { name })
+    assert.deepEqual(screen.getAllByRole('option').map(o => o.textContent), ['All organizations', 'Bishopric', 'Elders Quorum', 'Not grouped yet'])
+    assert.equal(option('Bishopric').getAttribute('aria-selected'), 'true')
+
+    await click(option('Bishopric'))
+    assert.deepEqual(headings(), ['Elders Quorum', 'Not grouped yet'])
+    assert.equal(option('Bishopric').getAttribute('aria-selected'), 'false')
+    await click(option('Not grouped yet'))
+    assert.deepEqual(headings(), ['Elders Quorum'])
+    assert.ok(screen.getByRole('button', { name: 'Organizations: Elders Quorum' }))
 
     fireEvent.change(screen.getByLabelText('Search'), { target: { value: 'teachers' } })
     assert.ok(screen.getByText('Elders Quorum Teacher'))
+    fireEvent.change(screen.getByLabelText('Search'), { target: { value: '' } })
+
+    await click(option('Bishopric'))
+    assert.deepEqual(headings(), ['Bishopric', 'Elders Quorum'])
+    assert.ok(screen.getByRole('button', { name: 'Organizations: 2 of 3 organizations' }))
+
+    await click(option('All organizations'))
+    assert.deepEqual(headings(), ['Bishopric', 'Elders Quorum', 'Not grouped yet'])
+    await click(option('All organizations'))
+    assert.deepEqual(headings(), [])
+    assert.ok(screen.getByText('No organizations picked.'))
+    assert.ok(screen.getByRole('button', { name: 'Organizations: No organizations' }))
   })
 
   it('saves where the calling is along with its candidates', async () => {

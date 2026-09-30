@@ -85,7 +85,9 @@ panel (for the `Members` tab, which holds the names). Changes made there show
 in the extension on **Refresh**, and the other way round.
 
 Callings are grouped by organization, and the headings within it, in LCR's
-order, and the **Organization** picker shows just one. Callings the sheet
+order. Like on LCR's Organizations page, the **Organizations** dropdown has a
+checkbox by each organization to add it to the view or take it out, and **All
+organizations** to show or hide them all at once. Callings the sheet
 doesn't have an Organization for yet (rows from before it was recorded) show
 last, under **Not grouped yet**, until someone presses **Sync all callings**.
 
