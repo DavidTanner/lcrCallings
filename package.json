@@ -1,6 +1,6 @@
 {
   "name": "callings",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Tracks who is being considered for callings on the LCR Organizations page, in a shared Google Sheet",
   "type": "module",
