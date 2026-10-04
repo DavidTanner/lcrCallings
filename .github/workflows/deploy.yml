@@ -20,7 +20,7 @@ jobs:
       group: pages
       cancel-in-progress: false
     environment:
-      name: github-pages
+      name: deploy-web
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v7
@@ -41,3 +41,58 @@ jobs:
           path: public
       - id: deploy
         uses: actions/deploy-pages@v5
+
+  # Publishes the extension to the Chrome Web Store when package.json's version
+  # hasn't been released yet, so bumping the version releases it. Tags the
+  # commit v<version> and attaches the zip to a GitHub release.
+  extension:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    environment:
+      name: deploy-extension
+    concurrency:
+      group: extension
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+      - id: version
+        run: |
+          version=$(jq -r .version package.json)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --tags origin "refs/tags/v$version" > /dev/null; then
+            echo "v$version is already released. Bump the version in package.json to release."
+          else
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.version.outputs.release
+        uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+          cache: npm
+      - if: steps.version.outputs.release
+        run: npm ci
+      # Repository variables. OAUTH_CLIENT_ID is the Chrome Extension OAuth
+      # client for the store's extension id, not the unpacked one.
+      - if: steps.version.outputs.release
+        run: npm run build
+        env:
+          OAUTH_CLIENT_ID: ${{ vars.OAUTH_CLIENT_ID }}
+          WEB_URL: ${{ vars.WEB_URL }}
+      - if: steps.version.outputs.release
+        run: cd dist && zip -r "../callings-$VERSION.zip" .
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+      - if: steps.version.outputs.release
+        run: npm run store:publish -- "callings-$VERSION.zip"
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          CWS_SERVICE_ACCOUNT: ${{ secrets.CWS_SERVICE_ACCOUNT }}
+          CWS_PUBLISHER_ID: ${{ vars.CWS_PUBLISHER_ID }}
+          CWS_EXTENSION_ID: ${{ vars.CWS_EXTENSION_ID }}
+      - if: steps.version.outputs.release
+        run: gh release create "v$VERSION" "callings-$VERSION.zip" --target "$GITHUB_SHA" --title "v$VERSION" --generate-notes
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          GH_TOKEN: ${{ github.token }}
