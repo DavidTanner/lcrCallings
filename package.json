@@ -17,6 +17,7 @@
     "web:build": "tsx scripts/web.ts",
     "pages:build": "npm run web:build && npm run demo:build",
     "keygen": "tsx scripts/keygen.ts",
+    "store:publish": "tsx scripts/publish.ts",
     "members": "tsx scripts/members.ts",
     "typecheck": "tsc",
     "lint": "eslint .",

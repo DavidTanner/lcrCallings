@@ -73,8 +73,8 @@ Google only issues tokens to an OAuth client tied to the extension's id, so:
 Chrome must be signed in to the Google account that has access to the sheet.
 
 To share it, send others the built `dist/` folder to load unpacked, or publish
-it to the Chrome Web Store as unlisted (upload a zip of `dist/`; the store
-assigns its own id, so add that id to the OAuth client too).
+it to the Chrome Web Store as unlisted (see [Releasing](#releasing); the
+store assigns its own id, so add that id to the OAuth client too).
 
 ## Web page
 
@@ -113,7 +113,7 @@ To set it up:
    optionally `SPREADSHEET_ID` so the page opens that sheet without being
    told. Neither is secret: they end up in the page.
 3. Under Settings → Pages, set **Source** to **GitHub Actions**.
-4. Push to `main`. `.github/workflows/ci.yml` runs the checks, then
+4. Push to `main`. `.github/workflows/deploy.yml` runs the checks, then
    `npm run pages:build` builds the page into `public/` and the
    [demo](#demo) into `public/demo/`, and publishes them to GitHub Pages at
    https://davidtanner.github.io/lcrCallings/ and
@@ -123,6 +123,45 @@ To set it up:
 
 Google's tokens last an hour. When one runs out the page keeps unsaved edits
 and shows **Save again**, which signs in again and saves them.
+
+## Releasing
+
+Pushing to `main` with a new `version` in `package.json` publishes the
+extension to the Chrome Web Store. The `extension` job in
+`.github/workflows/deploy.yml` sees that there's no `v<version>` tag yet, so it
+builds `dist/`, zips it, uploads it with `npm run store:publish` and submits it
+for review. Then it tags the commit `v<version>` and attaches the zip to a
+GitHub release. Pushes that don't change the version skip it. The store only
+accepts versions higher than the last one uploaded.
+
+To set it up, once:
+
+1. Upload a zip of `dist/` to the [Developer Dashboard](https://chrome.google.com/webstore/devconsole)
+   by hand, fill in the store listing and privacy tabs, and publish it
+   (unlisted, say). The API can only update an item that already exists, and
+   always publishes with the visibility it already has.
+2. The store assigns its own extension id, shown in the Developer Dashboard.
+   Create another **OAuth client ID** of type **Chrome Extension** with that
+   id as its **Item ID** (a client takes only one), and use its client id as
+   `OAUTH_CLIENT_ID` below. Keep the one in `.env` for the unpacked build.
+3. In the Google Cloud project, enable the **Chrome Web Store API**, create a
+   **service account** and add a JSON key for it. In the Developer Dashboard,
+   under **Account**, add the service account's email. The service account
+   is used because refresh tokens from a consent screen in Testing expire
+   after 7 days.
+4. On GitHub (Settings → Secrets and variables → Actions), add:
+   - secret `CWS_SERVICE_ACCOUNT`: the whole JSON key
+   - variable `CWS_PUBLISHER_ID`: from the Developer Dashboard, under
+     **Publisher → Settings**
+   - variable `CWS_EXTENSION_ID`: the store's id for the extension
+   - variable `OAUTH_CLIENT_ID`: the OAuth client id for the store's
+     extension id
+   - variable `WEB_URL`: `https://davidtanner.github.io/lcrCallings/`, so the
+     panel can share links to the [web page](#web-page)
+
+If the job fails after the store accepted the upload, re-running it fails too,
+as the version is already uploaded. Bump the version, or tag the commit and
+make the release by hand.
 
 ## Scripts
 
@@ -134,6 +173,7 @@ and shows **Save again**, which signs in again and saves them.
 | `npm run demo:build` | Builds the demo into `public/demo/`, after `web:build` (which empties `public/`) |
 | `npm run demo:sheet` | Writes the demo ward to `demo/sheet/` as CSV files to import into a Google Sheet (see [Demo sheet](#demo-sheet)) |
 | `npm run keygen`    | Adds a key pinning the extension id to `.env`                            |
+| `npm run store:publish -- <zip>` | Uploads a zip of `dist/` to the Chrome Web Store and submits it for review (see [Releasing](#releasing)) |
 | `npm run web`       | Serves the [web page](#web-page) at http://127.0.0.1:8002/, rebuilding on each load (needs `WEB_OAUTH_CLIENT_ID` in `.env`) |
 | `npm run web:build` | Builds the web page into `public/`                                       |
 | `npm run pages:build` | Builds the web page and the demo into `public/`, as published to GitHub Pages |
@@ -208,6 +248,8 @@ they're out of date.
   and saving (`src/useConsiderations.ts`).
 - `scripts/manifest.ts` generates `manifest.json` from `package.json` and
   `.env`.
+- `scripts/webstore.ts` talks to the Chrome Web Store API as a service
+  account, for `scripts/publish.ts`.
 - `resources/` holds saved LCR pages for development. They contain member
   data, so the folder is git-ignored.
 - Tests run in jsdom via `test/setup.ts`, which also teaches Node to import
