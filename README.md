@@ -7,6 +7,9 @@ everyone who uses it.
 
 Built with React, Mantine, TypeScript 6 and esbuild.
 
+See the [privacy policy](PRIVACY.md).
+See the [disclaimer policy](DISCLAIMER.md).
+
 ## Using it
 
 1. Open the Organizations page in LCR and click the extension's toolbar button.
