@@ -1,28 +1,17 @@
-name: CI
+name: Deploy
 
 on:
   push:
     branches: [main]
-  pull_request:
+  workflow_dispatch:
 
 jobs:
-  check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: lts/*
-          cache: npm
-      - run: npm ci
-      - run: npm run check
-      - run: npm run build
-      - run: npm run pages:build
+  test:
+    uses: ./.github/workflows/test.yml
 
   # Publishes the web page at / and the demo at /demo/ to GitHub Pages
   pages:
-    needs: check
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: test
     runs-on: ubuntu-latest
     permissions:
       pages: write
