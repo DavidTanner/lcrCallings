@@ -1,7 +1,7 @@
 import * as esbuild from 'esbuild'
 import { existsSync } from 'node:fs'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
-import { buildManifest } from './manifest'
+import { buildManifest } from './manifest.ts'
 import pkg from '../package.json'
 
 const dev = process.argv.includes('--dev')

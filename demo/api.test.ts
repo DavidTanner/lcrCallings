@@ -19,7 +19,7 @@ describe('demo', () => {
     await demoApi({ storage, delayMs: 0 }).save(DEMO_SPREADSHEET_ID, consideration)
 
     const reopened = demoApi({ storage, delayMs: 0 })
-    assert.deepEqual((await reopened.load(DEMO_SPREADSHEET_ID))['Organist|vacant|0'], consideration.candidates)
+    assert.deepEqual((await reopened.load(DEMO_SPREADSHEET_ID))['Organist|vacant|0'], { candidates: consideration.candidates })
 
     resetDemo(storage)
     assert.deepEqual(await reopened.load(DEMO_SPREADSHEET_ID), SEED_SHEET)
@@ -36,7 +36,7 @@ describe('demo', () => {
     assert.equal(await api.sync(DEMO_SPREADSHEET_ID, considerations), 1)
     const sheet = await api.load(DEMO_SPREADSHEET_ID)
     assert.deepEqual(sheet[seeded], SEED_SHEET[seeded])
-    assert.deepEqual(sheet['Sunbeam Teacher|vacant|0'], [])
+    assert.deepEqual(sheet['Sunbeam Teacher|vacant|0'], { candidates: [] })
     assert.equal(await api.sync(DEMO_SPREADSHEET_ID, considerations), 0)
   })
 
@@ -47,7 +47,7 @@ describe('demo', () => {
     cleanup()
 
     const names = new Set(MEMBERS.map(m => m.uuid))
-    for (const [key, candidates] of Object.entries(SEED_SHEET)) {
+    for (const [key, { candidates }] of Object.entries(SEED_SHEET)) {
       assert.ok(keys.has(key), `${key} is on the page`)
       for (const c of candidates) assert.ok(names.has(c.id), `${c.id} is a member`)
     }

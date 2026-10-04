@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { type Candidate, type Consideration, consideration as toConsideration } from './shared/consideration'
+import { type Candidate, type Consideration, type HolderStatus, consideration as toConsideration, type Tracking } from './shared/consideration'
 
 /** How long typing in notes pauses before they're saved */
 export const SAVE_DELAY_MS = 1000
 
 /** The calling a consideration is for, without who is being considered */
-export type CallingInfo = Omit<Consideration, 'candidates'>
+export type CallingInfo = Omit<Consideration, keyof Tracking>
 
 const message = (error: unknown) => error instanceof Error ? error.message : String(error)
 
@@ -14,13 +14,21 @@ interface PendingEdit {
   timer: ReturnType<typeof setTimeout>
 }
 
+const NOTHING_TRACKED: Tracking = { candidates: [] }
+
 /**
- * Who is being considered for each calling, by key, saving each change with
- * `save`: right away, or once typing pauses for `debounce`d changes. Saves
- * that fail are kept to `retry`.
+ * Who is being considered for each calling, and where its holder is, by key,
+ * saving each change with `save`: right away, or once typing pauses for
+ * `debounce`d changes. Saves that fail are kept to `retry`.
  */
-export function useConsiderations(initial: Record<string, Candidate[]>, save: (consideration: Consideration) => Promise<void>) {
-  const [values, setValues] = useState(initial)
+export function useConsiderations(initial: Record<string, Tracking>, save: (consideration: Consideration) => Promise<void>) {
+  const [values, setValuesState] = useState(initial)
+  /** the values as of the last change, for changes to one part of a row to keep the rest */
+  const latest = useRef(initial)
+  const setValues = useCallback((update: (current: Record<string, Tracking>) => Record<string, Tracking>) => {
+    latest.current = update(latest.current)
+    setValuesState(latest.current)
+  }, [])
   const [saving, setSaving] = useState(0)
   const [error, setError] = useState<string>()
   /** edits waiting for typing to pause, by key */
@@ -59,9 +67,10 @@ export function useConsiderations(initial: Record<string, Candidate[]>, save: (c
     write(edit.consideration)
   }, [write])
 
-  const change = useCallback((calling: CallingInfo, candidates: Candidate[], debounce: boolean) => {
-    const consideration = toConsideration(calling, candidates)
-    setValues(current => ({ ...current, [calling.key]: candidates }))
+  const edit = useCallback((calling: CallingInfo, update: (current: Tracking) => Tracking, debounce: boolean) => {
+    const tracked = update(latest.current[calling.key] ?? NOTHING_TRACKED)
+    const consideration = toConsideration(calling, tracked)
+    setValues(current => ({ ...current, [calling.key]: tracked }))
     clearTimeout(pending.current.get(calling.key)?.timer)
     // a newer edit replaces one that failed
     failed.current.delete(calling.key)
@@ -75,7 +84,17 @@ export function useConsiderations(initial: Record<string, Candidate[]>, save: (c
       pending.current.delete(calling.key)
       write(consideration)
     }
-  }, [flush, write])
+  }, [flush, write, setValues])
+
+  /** Changes who is being considered for a calling */
+  const change = useCallback((calling: CallingInfo, candidates: Candidate[], debounce: boolean) => {
+    edit(calling, current => ({ ...current, candidates }), debounce)
+  }, [edit])
+
+  /** Changes where a calling's holder is; clearing it leaves it out, as it is before one is picked */
+  const changeHolderStatus = useCallback((calling: CallingInfo, holderStatus: HolderStatus | undefined) => {
+    edit(calling, ({ candidates }) => ({ candidates, ...(holderStatus ? { holderStatus } : {}) }), false)
+  }, [edit])
 
   /** Saves every pending edit now, and waits for all saves to finish */
   const settle = useCallback(async () => {
@@ -91,7 +110,7 @@ export function useConsiderations(initial: Record<string, Candidate[]>, save: (c
   }, [write])
 
   /** Shows `fresh` values from the sheet, keeping edits that haven't been saved yet */
-  const replace = useCallback((fresh: Record<string, Candidate[]>) => {
+  const replace = useCallback((fresh: Record<string, Tracking>) => {
     setValues((current) => {
       const next = { ...fresh }
       for (const key of [...pending.current.keys(), ...failed.current.keys()]) {
@@ -100,7 +119,7 @@ export function useConsiderations(initial: Record<string, Candidate[]>, save: (c
       }
       return next
     })
-  }, [])
+  }, [setValues])
 
   // don't lose notes still being typed when unmounted
   useEffect(() => {
@@ -110,5 +129,5 @@ export function useConsiderations(initial: Record<string, Candidate[]>, save: (c
     }
   }, [flush])
 
-  return { values, change, flush, settle, retry, replace, saving, unsaved, error, setError }
+  return { values, change, changeHolderStatus, flush, settle, retry, replace, saving, unsaved, error, setError }
 }

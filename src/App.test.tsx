@@ -6,7 +6,7 @@ import { fakeClipboard } from '../test/clipboard'
 import { fakeApi, MEMBERS, orgTable } from '../test/fixtures'
 import { App } from './App'
 import { LAYER_ID } from './constants'
-import { SLOT } from './page/enhance'
+import { HOLDER_SLOT, SLOT } from './page/enhance'
 import { SAVE_DELAY_MS } from './Tracker'
 
 const SHEET_ID = '1AbC-dEf_ghIJklMNopQRstuVWxyz0123456789'
@@ -17,6 +17,9 @@ const cell = (calling: string) => [...document.querySelectorAll(`[${SLOT}]`)]
 const input = (calling: string) => cell(calling)?.querySelector<HTMLInputElement>(`input[aria-label="Considering for ${calling}"]`)
 const notes = (calling: string, name: string) => cell(calling)?.querySelector<HTMLTextAreaElement>(`textarea[aria-label="Notes on ${name} for ${calling}"]`)
 const status = (calling: string, name: string) => cell(calling)?.querySelector<HTMLInputElement>(`input[aria-label="Status of ${name} for ${calling}"]`)
+/** What's rendered into the end of a calling's Name cell, inside its shadow root */
+const holderCell = (calling: string) => [...document.querySelectorAll<HTMLElement>(`[${HOLDER_SLOT}]`)]
+  .find(slot => slot.getAttribute(HOLDER_SLOT)?.startsWith(`${calling}|`))
 const picked = (calling: string) => [...cell(calling)?.querySelectorAll('.mantine-Pill-label') ?? []].map(pill => pill.textContent)
 async function pick(calling: string, name: string) {
   const field = input(calling)
@@ -65,7 +68,7 @@ describe('App', () => {
   })
 
   it('reconnects to the saved sheet and shows its candidates and notes', async () => {
-    renderApp(fakeApi({ spreadsheetId: SHEET_ID, sheet: { 'Ward Clerk|vacant|0': [{ id: 'm1', notes: 'Good with numbers', status: 'Pray about' }] } }))
+    renderApp(fakeApi({ spreadsheetId: SHEET_ID, sheet: { 'Ward Clerk|vacant|0': { candidates: [{ id: 'm1', notes: 'Good with numbers', status: 'Pray about' }] } } }))
     await screen.findByText(/Tracking 2 callings/)
     assert.deepEqual(picked('Ward Clerk'), ['Abel, Bea'])
     assert.equal(notes('Ward Clerk', 'Abel, Bea')?.value, 'Good with numbers')
@@ -75,14 +78,14 @@ describe('App', () => {
   })
 
   it('shows candidates who are not in the member list', async () => {
-    renderApp(fakeApi({ spreadsheetId: SHEET_ID, sheet: { 'Ward Clerk|vacant|0': [{ id: 'text:Brother Jones', notes: '' }, { id: 'moved-out', notes: '' }] } }))
+    renderApp(fakeApi({ spreadsheetId: SHEET_ID, sheet: { 'Ward Clerk|vacant|0': { candidates: [{ id: 'text:Brother Jones', notes: '' }, { id: 'moved-out', notes: '' }] } } }))
     await screen.findByText(/Tracking/)
     assert.deepEqual(picked('Ward Clerk'), ['Brother Jones', 'moved-out'])
   })
 
   it('tells apart members with the same name', async () => {
     const members = [...MEMBERS, { uuid: 'm4', name: 'Abel, Bea', nameSort: 'ABEL, BEA' }]
-    const api = fakeApi({ spreadsheetId: SHEET_ID, members, sheet: { 'Bishop|p1|0': [{ id: 'm4', notes: 'The younger one' }] } })
+    const api = fakeApi({ spreadsheetId: SHEET_ID, members, sheet: { 'Bishop|p1|0': { candidates: [{ id: 'm4', notes: 'The younger one' }] } } })
     renderApp(api)
     await screen.findByText(/Tracking/)
     assert.equal(notes('Bishop', 'Abel, Bea')?.value, 'The younger one')
@@ -113,7 +116,7 @@ describe('App', () => {
   })
 
   it('saves notes once typing pauses, or when leaving the field', async () => {
-    const api = fakeApi({ spreadsheetId: SHEET_ID, sheet: { 'Bishop|p1|0': [{ id: 'm1', notes: '' }] } })
+    const api = fakeApi({ spreadsheetId: SHEET_ID, sheet: { 'Bishop|p1|0': { candidates: [{ id: 'm1', notes: '' }] } } })
     renderApp(api)
     await screen.findByText(/Tracking/)
     mock.timers.enable({ apis: ['setTimeout'] })
@@ -144,7 +147,7 @@ describe('App', () => {
   })
 
   it('saves a candidate\'s status right away, and clears it', async () => {
-    const api = fakeApi({ spreadsheetId: SHEET_ID, sheet: { 'Bishop|p1|0': [{ id: 'm1', notes: 'Ask' }] } })
+    const api = fakeApi({ spreadsheetId: SHEET_ID, sheet: { 'Bishop|p1|0': { candidates: [{ id: 'm1', notes: 'Ask' }] } } })
     renderApp(api)
     await screen.findByText(/Tracking/)
     const field = status('Bishop', 'Abel, Bea')
@@ -167,6 +170,43 @@ describe('App', () => {
       await Promise.resolve()
     })
     assert.deepEqual(api.saved.at(-1)?.candidates, [{ id: 'm1', notes: 'Ask' }])
+  })
+
+  it('saves the holder\'s status from the Name cell, highlighting the cell', async () => {
+    const api = fakeApi({ spreadsheetId: SHEET_ID, members: [...MEMBERS, { uuid: 'p1', name: 'Pratt, Orson', nameSort: 'PRATT, ORSON' }], sheet: { 'Bishop|p1|0': { candidates: [{ id: 'm1', notes: 'Ask' }] } } })
+    renderApp(api)
+    await screen.findByText(/Tracking/)
+    const slot = holderCell('Bishop')
+    const container = slot?.shadowRoot?.lastElementChild as HTMLElement | null | undefined
+    const nameCell = slot?.parentElement
+    const field = await waitFor(() => {
+      const found = container?.querySelector<HTMLInputElement>('input[aria-label="Status of Pratt, Orson as Bishop"]')
+      assert.ok(found)
+      return found
+    })
+    assert.ok(container && nameCell)
+    assert.equal(nameCell.style.backgroundColor, '')
+    // nobody holds a vacant calling to have a status, and it's highlighted instead
+    assert.ok(!holderCell('Ward Clerk')?.shadowRoot?.querySelector('input'))
+    assert.notEqual(holderCell('Ward Clerk')?.parentElement?.style.backgroundColor, '')
+
+    fireEvent.click(field)
+    await act(async () => {
+      fireEvent.click(await within(container).findByRole('option', { name: 'Considering Release' }))
+      await Promise.resolve()
+    })
+    assert.deepEqual(api.saved.at(-1), { key: 'Bishop|p1|0', calling: 'Bishop', member: 'p1', organization: ['Bishopric'], position: 0, candidates: [{ id: 'm1', notes: 'Ask' }], holderStatus: 'Considering Release' })
+    assert.notEqual(nameCell.style.backgroundColor, '')
+
+    const clear = container.querySelector<HTMLButtonElement>('.mantine-InputClearButton-root')
+    assert.ok(clear)
+    await act(async () => {
+      fireEvent.click(clear)
+      await Promise.resolve()
+    })
+    assert.deepEqual(api.saved.at(-1)?.holderStatus, undefined)
+    assert.deepEqual(api.saved.at(-1)?.candidates, [{ id: 'm1', notes: 'Ask' }])
+    assert.equal(nameCell.style.backgroundColor, '')
   })
 
   it('reports save failures', async () => {
@@ -197,7 +237,7 @@ describe('App', () => {
     const api = fakeApi({ spreadsheetId: SHEET_ID })
     renderApp(api)
     await screen.findByText(/Tracking/)
-    api.sheet['Bishop|p1|0'] = [{ id: 'm3', notes: 'From someone else' }]
+    api.sheet['Bishop|p1|0'] = { candidates: [{ id: 'm3', notes: 'From someone else' }] }
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
       await Promise.resolve()
@@ -207,7 +247,7 @@ describe('App', () => {
   })
 
   it('syncs every calling on the page to the sheet', async () => {
-    const api = fakeApi({ spreadsheetId: SHEET_ID, sheet: { 'Bishop|p1|0': [{ id: 'm1', notes: 'Theirs' }] } })
+    const api = fakeApi({ spreadsheetId: SHEET_ID, sheet: { 'Bishop|p1|0': { candidates: [{ id: 'm1', notes: 'Theirs' }] } } })
     renderApp(api)
     await screen.findByText(/Tracking/)
     await act(async () => {
@@ -216,7 +256,7 @@ describe('App', () => {
     })
     assert.ok(await screen.findByText('Added 1 calling to the sheet.'))
     assert.deepEqual(api.synced, [{ key: 'Ward Clerk|vacant|0', calling: 'Ward Clerk', member: '', organization: ['Bishopric'], position: 1, candidates: [] }])
-    assert.deepEqual(api.sheet['Bishop|p1|0'], [{ id: 'm1', notes: 'Theirs' }])
+    assert.deepEqual(api.sheet['Bishop|p1|0'], { candidates: [{ id: 'm1', notes: 'Theirs' }] })
 
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Sync all callings' }))
@@ -226,7 +266,7 @@ describe('App', () => {
   })
 
   it('saves notes still being typed before syncing', async () => {
-    const api = fakeApi({ spreadsheetId: SHEET_ID, sheet: { 'Bishop|p1|0': [{ id: 'm1', notes: '' }] } })
+    const api = fakeApi({ spreadsheetId: SHEET_ID, sheet: { 'Bishop|p1|0': { candidates: [{ id: 'm1', notes: '' }] } } })
     renderApp(api)
     await screen.findByText(/Tracking/)
     const field = notes('Bishop', 'Abel, Bea')

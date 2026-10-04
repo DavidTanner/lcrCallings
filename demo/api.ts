@@ -1,5 +1,5 @@
 import type { ExtensionApi } from '../src/content/api'
-import type { Candidate } from '../src/shared/consideration'
+import { type Candidate, type Tracking, tracking } from '../src/shared/consideration'
 import { MEMBERS, SEED_SHEET } from './data'
 
 /** Stands in for the Google Sheet link; anything that looks like one is accepted */
@@ -39,9 +39,12 @@ export function demoApi({ storage = memoryStorage(), delayMs = 400 }: DemoApiOpt
     }, delayMs)
   })
 
-  const readSheet = (): Record<string, Candidate[]> => {
+  const readSheet = (): Record<string, Tracking> => {
     const saved = storage.getItem(SHEET_KEY)
-    return saved ? JSON.parse(saved) as Record<string, Candidate[]> : structuredClone(SEED_SHEET)
+    if (!saved) return structuredClone(SEED_SHEET)
+    // saved before holder statuses, each row was just its candidates
+    const rows = JSON.parse(saved) as Record<string, Tracking | Candidate[]>
+    return Object.fromEntries(Object.entries(rows).map(([key, row]) => [key, Array.isArray(row) ? { candidates: row } : row]))
   }
 
   return {
@@ -52,18 +55,18 @@ export function demoApi({ storage = memoryStorage(), delayMs = 400 }: DemoApiOpt
       return Promise.resolve()
     },
     load: () => wait(readSheet()),
-    save: async (_id, { key, candidates }) => {
+    save: async (_id, consideration) => {
       await wait(null)
       const sheet = readSheet()
       // like the real sheet, the row stays when its candidates are cleared
-      sheet[key] = candidates
+      sheet[consideration.key] = tracking(consideration)
       storage.setItem(SHEET_KEY, JSON.stringify(sheet))
     },
     sync: async (_id, considerations) => {
       await wait(null)
       const sheet = readSheet()
       const missing = considerations.filter(c => !(c.key in sheet))
-      for (const { key, candidates } of missing) sheet[key] = candidates
+      for (const c of missing) sheet[c.key] = tracking(c)
       storage.setItem(SHEET_KEY, JSON.stringify(sheet))
       return missing.length
     },

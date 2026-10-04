@@ -1,4 +1,4 @@
-import { type Candidate, type Consideration, isStatus } from '../shared/consideration'
+import { type Candidate, type Consideration, type HolderStatus, isHolderStatus, isStatus, type Tracking, tracking } from '../shared/consideration'
 
 /** Title of the tab the extension keeps its rows in */
 export const SHEET_TITLE = 'Considering'
@@ -8,10 +8,11 @@ export const SHEET_TITLE = 'Considering'
  * sheet; the extension reads candidates back from Data. Rows saved before Data
  * existed only have Considering, as free text. Organization and Position say
  * where the calling is on the Organizations page, so it can be shown the same
- * way away from it.
+ * way away from it. Holder status is where whoever holds the calling now is,
+ * e.g. being considered for release.
  */
-export const HEADER = ['Key', 'Calling', 'Held by', 'Considering', 'Updated', 'Notes', 'Data', 'Status', 'Organization', 'Position']
-const LAST_COLUMN = 'J'
+export const HEADER = ['Key', 'Calling', 'Held by', 'Considering', 'Updated', 'Notes', 'Data', 'Status', 'Organization', 'Position', 'Holder status']
+const LAST_COLUMN = 'K'
 /** Organization and Position */
 const PLACEMENT_COLUMNS = ['I', 'J'] as const
 
@@ -69,7 +70,7 @@ export function createSheetsClient(tokens: TokenProvider, fetchFn: (url: string,
 
   const range = (id: string, a1: string, tab = SHEET_TITLE) => `${encodeURIComponent(id)}/values/${encodeURIComponent(`'${tab}'!${a1}`)}`
   const row = (consideration: Consideration) => {
-    const { key, calling, member, candidates } = consideration
+    const { key, calling, member, candidates, holderStatus } = consideration
     return [
       key,
       calling,
@@ -80,6 +81,7 @@ export function createSheetsClient(tokens: TokenProvider, fetchFn: (url: string,
       candidates.length ? JSON.stringify(candidates) : '',
       candidates.filter(c => c.status).map(c => `${c.id}: ${c.status ?? ''}`).join('\n'),
       ...placement(consideration),
+      holderStatus ?? '',
     ]
   }
   const append = (id: string, considerations: Consideration[]) =>
@@ -136,16 +138,16 @@ export function createSheetsClient(tokens: TokenProvider, fetchFn: (url: string,
     const rows = new Map<string, Consideration>()
     for (const row of values) {
       const [key = '', calling = '', member = ''] = row
-      if (key) rows.set(key, { key, calling, member, ...placementIn(row), candidates: candidatesIn(row) })
+      if (key) rows.set(key, { key, calling, member, ...placementIn(row), ...trackingIn(row) })
     }
     return [...rows.values()]
   }
 
   return {
-    /** key → who is being considered. Later rows win if a key is repeated. */
-    async load(id: string): Promise<Record<string, Candidate[]>> {
+    /** key → who is being considered, and where the holder is. Later rows win if a key is repeated. */
+    async load(id: string): Promise<Record<string, Tracking>> {
       const rows = await loadRows(id)
-      return Object.fromEntries(rows.map(({ key, candidates }) => [key, candidates]))
+      return Object.fromEntries(rows.map(row => [row.key, tracking(row)]))
     },
 
     loadRows,
@@ -238,6 +240,18 @@ export function placementIn([, , , , , , , , organization = '', position = '']: 
     ...(headings.length ? { organization: headings } : {}),
     ...(Number.isInteger(at) && at >= 0 ? { position: at } : {}),
   }
+}
+
+/** Who is being considered in a row, and where the holder is */
+export function trackingIn(row: string[]): Tracking {
+  const holderStatus = holderStatusIn(row)
+  return { candidates: candidatesIn(row), ...(holderStatus ? { holderStatus } : {}) }
+}
+
+/** The Holder status cell, unless it's empty or edited by hand into something unknown */
+function holderStatusIn([, , , , , , , , , , status = '']: string[]): HolderStatus | undefined {
+  const value = status.trim()
+  return isHolderStatus(value) ? value : undefined
 }
 
 /** Looks like an LCR member uuid */

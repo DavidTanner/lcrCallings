@@ -1,37 +1,37 @@
-Key,Calling,Held by,Considering,Updated,Notes,Data,Status,Organization,Position
-Bishop|demo-anderson-mark|0,Bishop,demo-anderson-mark,,2025-01-01T00:00:00.000Z,,,,Bishopric,0
-Bishopric First Counselor|demo-chen-lucas|0,Bishopric First Counselor,demo-chen-lucas,,2025-01-01T00:00:00.000Z,,,,Bishopric,1
-Bishopric Second Counselor|demo-nielsen-erik|0,Bishopric Second Counselor,demo-nielsen-erik,,2025-01-01T00:00:00.000Z,,,,Bishopric,2
-Ward Executive Secretary|demo-brooks-daniel|0,Ward Executive Secretary,demo-brooks-daniel,,2025-01-01T00:00:00.000Z,,,,Bishopric,3
-Ward Clerk|demo-jensen-peter|0,Ward Clerk,demo-jensen-peter,,2025-01-01T00:00:00.000Z,,,,Bishopric,4
-Ward Assistant Clerk|vacant|0,Ward Assistant Clerk,,demo-sato-kenji,2025-01-01T00:00:00.000Z,demo-sato-kenji: Good with spreadsheets; works from home on Sundays.,"[{""id"":""demo-sato-kenji"",""notes"":""Good with spreadsheets; works from home on Sundays."",""status"":""Schedule for Interview""}]",demo-sato-kenji: Schedule for Interview,Bishopric,5
-Elders Quorum President|demo-evans-thomas|0,Elders Quorum President,demo-evans-thomas,,2025-01-01T00:00:00.000Z,,,,Elders Quorum > Elders Quorum Presidency,6
-Elders Quorum First Counselor|demo-kim-joseph|0,Elders Quorum First Counselor,demo-kim-joseph,,2025-01-01T00:00:00.000Z,,,,Elders Quorum > Elders Quorum Presidency,7
-Elders Quorum Second Counselor|demo-reyes-adrian|0,Elders Quorum Second Counselor,demo-reyes-adrian,,2025-01-01T00:00:00.000Z,,,,Elders Quorum > Elders Quorum Presidency,8
+Key,Calling,Held by,Considering,Updated,Notes,Data,Status,Organization,Position,Holder status
+Bishop|demo-anderson-mark|0,Bishop,demo-anderson-mark,,2025-01-01T00:00:00.000Z,,,,Bishopric,0,
+Bishopric First Counselor|demo-chen-lucas|0,Bishopric First Counselor,demo-chen-lucas,,2025-01-01T00:00:00.000Z,,,,Bishopric,1,
+Bishopric Second Counselor|demo-nielsen-erik|0,Bishopric Second Counselor,demo-nielsen-erik,,2025-01-01T00:00:00.000Z,,,,Bishopric,2,
+Ward Executive Secretary|demo-brooks-daniel|0,Ward Executive Secretary,demo-brooks-daniel,,2025-01-01T00:00:00.000Z,,,,Bishopric,3,
+Ward Clerk|demo-jensen-peter|0,Ward Clerk,demo-jensen-peter,,2025-01-01T00:00:00.000Z,,,,Bishopric,4,
+Ward Assistant Clerk|vacant|0,Ward Assistant Clerk,,demo-sato-kenji,2025-01-01T00:00:00.000Z,demo-sato-kenji: Good with spreadsheets; works from home on Sundays.,"[{""id"":""demo-sato-kenji"",""notes"":""Good with spreadsheets; works from home on Sundays."",""status"":""Schedule for Interview""}]",demo-sato-kenji: Schedule for Interview,Bishopric,5,
+Elders Quorum President|demo-evans-thomas|0,Elders Quorum President,demo-evans-thomas,,2025-01-01T00:00:00.000Z,,,,Elders Quorum > Elders Quorum Presidency,6,
+Elders Quorum First Counselor|demo-kim-joseph|0,Elders Quorum First Counselor,demo-kim-joseph,,2025-01-01T00:00:00.000Z,,,,Elders Quorum > Elders Quorum Presidency,7,
+Elders Quorum Second Counselor|demo-reyes-adrian|0,Elders Quorum Second Counselor,demo-reyes-adrian,,2025-01-01T00:00:00.000Z,,,,Elders Quorum > Elders Quorum Presidency,8,
 Elders Quorum Secretary|vacant|0,Elders Quorum Secretary,,"demo-lopez-gabriel
 demo-parker-jacob",2025-01-01T00:00:00.000Z,demo-lopez-gabriel: Suggested by the EQ presidency.,"[{""id"":""demo-lopez-gabriel"",""notes"":""Suggested by the EQ presidency."",""status"":""Submitted by Presidency""},{""id"":""demo-parker-jacob"",""notes"":"""",""status"":""Discussion""}]","demo-lopez-gabriel: Submitted by Presidency
-demo-parker-jacob: Discussion",Elders Quorum > Elders Quorum Presidency,9
-Elders Quorum Teacher|demo-hughes-owen|0,Elders Quorum Teacher,demo-hughes-owen,,2025-01-01T00:00:00.000Z,,,,Elders Quorum > Teachers,10
-Elders Quorum Teacher|vacant|0,Elders Quorum Teacher,,,2025-01-01T00:00:00.000Z,,,,Elders Quorum > Teachers,11
-Relief Society President|demo-larsen-anna|0,Relief Society President,demo-larsen-anna,,2025-01-01T00:00:00.000Z,,,,Relief Society > Relief Society Presidency,12
-Relief Society First Counselor|demo-garcia-lucia|0,Relief Society First Counselor,demo-garcia-lucia,,2025-01-01T00:00:00.000Z,,,,Relief Society > Relief Society Presidency,13
-Relief Society Second Counselor|demo-ito-keiko|0,Relief Society Second Counselor,demo-ito-keiko,,2025-01-01T00:00:00.000Z,,,,Relief Society > Relief Society Presidency,14
+demo-parker-jacob: Discussion",Elders Quorum > Elders Quorum Presidency,9,
+Elders Quorum Teacher|demo-hughes-owen|0,Elders Quorum Teacher,demo-hughes-owen,,2025-01-01T00:00:00.000Z,,,,Elders Quorum > Teachers,10,
+Elders Quorum Teacher|vacant|0,Elders Quorum Teacher,,,2025-01-01T00:00:00.000Z,,,,Elders Quorum > Teachers,11,
+Relief Society President|demo-larsen-anna|0,Relief Society President,demo-larsen-anna,,2025-01-01T00:00:00.000Z,,,,Relief Society > Relief Society Presidency,12,
+Relief Society First Counselor|demo-garcia-lucia|0,Relief Society First Counselor,demo-garcia-lucia,,2025-01-01T00:00:00.000Z,,,,Relief Society > Relief Society Presidency,13,
+Relief Society Second Counselor|demo-ito-keiko|0,Relief Society Second Counselor,demo-ito-keiko,,2025-01-01T00:00:00.000Z,,,,Relief Society > Relief Society Presidency,14,
 Relief Society Secretary|demo-walker-esther|0,Relief Society Secretary,demo-walker-esther,"demo-walker-esther
-demo-ellis-naomi",2025-01-01T00:00:00.000Z,demo-walker-esther: Moving in December.,"[{""id"":""demo-walker-esther"",""notes"":""Moving in December."",""status"":""Need to release""},{""id"":""demo-ellis-naomi"",""notes"":""""}]",demo-walker-esther: Need to release,Relief Society > Relief Society Presidency,15
-Relief Society Teacher|demo-fischer-clara|0,Relief Society Teacher,demo-fischer-clara,,2025-01-01T00:00:00.000Z,,,,Relief Society > Teachers,16
-Relief Society Teacher|demo-martin-olivia|0,Relief Society Teacher,demo-martin-olivia,,2025-01-01T00:00:00.000Z,,,,Relief Society > Teachers,17
-Primary President|demo-bennett-grace|0,Primary President,demo-bennett-grace,,2025-01-01T00:00:00.000Z,,,,Primary > Primary Presidency,18
-Primary First Counselor|vacant|0,Primary First Counselor,,demo-carter-emily,2025-01-01T00:00:00.000Z,demo-carter-emily: Accepted on Tuesday.,"[{""id"":""demo-carter-emily"",""notes"":""Accepted on Tuesday."",""status"":""Ready to sustain""}]",demo-carter-emily: Ready to sustain,Primary > Primary Presidency,19
-Primary Second Counselor|demo-nguyen-linh|0,Primary Second Counselor,demo-nguyen-linh,,2025-01-01T00:00:00.000Z,,,,Primary > Primary Presidency,20
-Primary Secretary|demo-davis-hannah|0,Primary Secretary,demo-davis-hannah,,2025-01-01T00:00:00.000Z,,,,Primary > Primary Presidency,21
-Primary Teacher|demo-smith-caleb|0,Primary Teacher,demo-smith-caleb,,2025-01-01T00:00:00.000Z,,,,Primary > Teachers,22
-Primary Teacher|demo-peterson-leah|0,Primary Teacher,demo-peterson-leah,,2025-01-01T00:00:00.000Z,,,,Primary > Teachers,23
+demo-ellis-naomi",2025-01-01T00:00:00.000Z,demo-walker-esther: Moving in December.,"[{""id"":""demo-walker-esther"",""notes"":""Moving in December."",""status"":""Need to release""},{""id"":""demo-ellis-naomi"",""notes"":""""}]",demo-walker-esther: Need to release,Relief Society > Relief Society Presidency,15,Considering Release
+Relief Society Teacher|demo-fischer-clara|0,Relief Society Teacher,demo-fischer-clara,,2025-01-01T00:00:00.000Z,,,,Relief Society > Teachers,16,
+Relief Society Teacher|demo-martin-olivia|0,Relief Society Teacher,demo-martin-olivia,,2025-01-01T00:00:00.000Z,,,,Relief Society > Teachers,17,
+Primary President|demo-bennett-grace|0,Primary President,demo-bennett-grace,,2025-01-01T00:00:00.000Z,,,,Primary > Primary Presidency,18,
+Primary First Counselor|vacant|0,Primary First Counselor,,demo-carter-emily,2025-01-01T00:00:00.000Z,demo-carter-emily: Accepted on Tuesday.,"[{""id"":""demo-carter-emily"",""notes"":""Accepted on Tuesday."",""status"":""Ready to sustain""}]",demo-carter-emily: Ready to sustain,Primary > Primary Presidency,19,
+Primary Second Counselor|demo-nguyen-linh|0,Primary Second Counselor,demo-nguyen-linh,,2025-01-01T00:00:00.000Z,,,,Primary > Primary Presidency,20,
+Primary Secretary|demo-davis-hannah|0,Primary Secretary,demo-davis-hannah,,2025-01-01T00:00:00.000Z,,,,Primary > Primary Presidency,21,
+Primary Teacher|demo-smith-caleb|0,Primary Teacher,demo-smith-caleb,,2025-01-01T00:00:00.000Z,,,,Primary > Teachers,22,
+Primary Teacher|demo-peterson-leah|0,Primary Teacher,demo-peterson-leah,,2025-01-01T00:00:00.000Z,,,,Primary > Teachers,23,
 Nursery Leader|vacant|0,Nursery Leader,,"demo-quinn-rachel
 demo-morgan-eli",2025-01-01T00:00:00.000Z,demo-morgan-eli: Could serve with Rachel.,"[{""id"":""demo-quinn-rachel"",""notes"":"""",""status"":""Pray about""},{""id"":""demo-morgan-eli"",""notes"":""Could serve with Rachel."",""status"":""Pray about""}]","demo-quinn-rachel: Pray about
-demo-morgan-eli: Pray about",Primary > Teachers,24
-Sunday School President|demo-turner-nathan|0,Sunday School President,demo-turner-nathan,,2025-01-01T00:00:00.000Z,,,,Sunday School,25
-Gospel Doctrine Teacher|demo-roberts-julia|0,Gospel Doctrine Teacher,demo-roberts-julia,,2025-01-01T00:00:00.000Z,,,,Sunday School,26
-Youth Sunday School Teacher|vacant|0,Youth Sunday School Teacher,,,2025-01-01T00:00:00.000Z,,,,Sunday School,27
-Music Coordinator|demo-taylor-megan|0,Music Coordinator,demo-taylor-megan,,2025-01-01T00:00:00.000Z,,,,Music,28
-Organist|vacant|0,Organist,,demo-young-benjamin,2025-01-01T00:00:00.000Z,demo-young-benjamin: Took piano lessons for 10 years.,"[{""id"":""demo-young-benjamin"",""notes"":""Took piano lessons for 10 years."",""status"":""Contacted for Interview""}]",demo-young-benjamin: Contacted for Interview,Music,29
-Choir Director|demo-alvarez-sofia|0,Choir Director,demo-alvarez-sofia,,2025-01-01T00:00:00.000Z,,,,Music,30
+demo-morgan-eli: Pray about",Primary > Teachers,24,
+Sunday School President|demo-turner-nathan|0,Sunday School President,demo-turner-nathan,,2025-01-01T00:00:00.000Z,,,,Sunday School,25,
+Gospel Doctrine Teacher|demo-roberts-julia|0,Gospel Doctrine Teacher,demo-roberts-julia,,2025-01-01T00:00:00.000Z,,,,Sunday School,26,
+Youth Sunday School Teacher|vacant|0,Youth Sunday School Teacher,,,2025-01-01T00:00:00.000Z,,,,Sunday School,27,
+Music Coordinator|demo-taylor-megan|0,Music Coordinator,demo-taylor-megan,,2025-01-01T00:00:00.000Z,,,,Music,28,
+Organist|vacant|0,Organist,,demo-young-benjamin,2025-01-01T00:00:00.000Z,demo-young-benjamin: Took piano lessons for 10 years.,"[{""id"":""demo-young-benjamin"",""notes"":""Took piano lessons for 10 years."",""status"":""Contacted for Interview""}]",demo-young-benjamin: Contacted for Interview,Music,29,
+Choir Director|demo-alvarez-sofia|0,Choir Director,demo-alvarez-sofia,,2025-01-01T00:00:00.000Z,,,,Music,30,
