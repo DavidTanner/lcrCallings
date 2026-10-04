@@ -3,19 +3,21 @@ import mantineCss from '@mantine/core/styles.css'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { CandidatesField } from './CandidatesField'
+import { HolderStatusField, type HolderStatusFieldProps, highlightColor, vacantHighlight } from './HolderStatusField'
 import { LAYER_ID } from './constants'
 import type { ExtensionApi } from './content/api'
 import type { Member } from './lcr/members'
 import { type CallingRow, enhancePage } from './page/enhance'
 import { shadowContainer } from './shadow'
 import { ShareLinkButton } from './ShareLinkButton'
-import { type Candidate, type Consideration, consideration } from './shared/consideration'
+import { type Candidate, type Consideration, consideration, type Tracking } from './shared/consideration'
 import { spreadsheetUrl } from './shared/spreadsheet'
 import { useConsiderations } from './useConsiderations'
 
 export { SAVE_DELAY_MS } from './useConsiderations'
 
 const NO_CANDIDATES: Candidate[] = []
+const NOTHING_TRACKED: Tracking = { candidates: NO_CANDIDATES }
 
 const message = (error: unknown) => error instanceof Error ? error.message : String(error)
 const sameRows = (a: CallingRow[], b: CallingRow[]) => a.length === b.length && a.every((row, i) => row === b[i])
@@ -49,7 +51,7 @@ export interface TrackerProps {
   doc: Document
   api: ExtensionApi
   spreadsheetId: string
-  initial: Record<string, Candidate[]>
+  initial: Record<string, Tracking>
   /** where the web page is, to share links to it */
   webUrl?: string
   onChangeSheet: () => void
@@ -67,11 +69,14 @@ export function Tracker({ doc, api, spreadsheetId, initial, webUrl, onChangeShee
   const [layer] = useState(() => createLayer(doc))
 
   const save = useCallback((consideration: Consideration) => api.save(spreadsheetId, consideration), [api, spreadsheetId])
-  const { values, change, flush, settle, replace, saving, error, setError } = useConsiderations(initial, save)
+  const { values, change, changeHolderStatus, flush, settle, replace, saving, error, setError } = useConsiderations(initial, save)
 
   useEffect(() => {
     const e = enhancePage(doc, (next) => {
-      for (const row of next) lightContainer(row.slot)
+      for (const row of next) {
+        lightContainer(row.slot)
+        lightContainer(row.holderSlot)
+      }
       setRows(current => sameRows(current, next) ? current : next)
     })
     return () => {
@@ -131,7 +136,7 @@ export function Tracker({ doc, api, spreadsheetId, initial, webUrl, onChangeShee
     try {
       // let edits land first, so a row they add isn't added again
       await settle()
-      const added = await api.sync(spreadsheetId, rows.map(row => consideration(row, values[row.key] ?? NO_CANDIDATES)))
+      const added = await api.sync(spreadsheetId, rows.map(row => consideration(row, values[row.key] ?? NOTHING_TRACKED)))
       setSynced(added
         ? `Added ${String(added)} ${added === 1 ? 'calling' : 'callings'} to the sheet.`
         : 'Every calling is already in the sheet.')
@@ -174,7 +179,7 @@ export function Tracker({ doc, api, spreadsheetId, initial, webUrl, onChangeShee
       {rows.map(row => createPortal(
         <CandidatesField
           row={row}
-          candidates={values[row.key] ?? NO_CANDIDATES}
+          candidates={values[row.key]?.candidates ?? NO_CANDIDATES}
           options={options}
           names={names}
           loading={loading}
@@ -186,6 +191,42 @@ export function Tracker({ doc, api, spreadsheetId, initial, webUrl, onChangeShee
         lightContainer(row.slot),
         row.key,
       ))}
+      {rows.map(row => row.member
+        ? createPortal(
+            <HolderCell
+              row={row}
+              holder={names.get(row.member) ?? 'the holder'}
+              status={values[row.key]?.holderStatus}
+              dropdownTarget={layer.target}
+              onChange={changeHolderStatus}
+            />,
+            lightContainer(row.holderSlot),
+            `${row.key}|holder`,
+          )
+        : <VacantCell key={`${row.key}|vacant`} nameCell={row.nameCell} />)}
     </>
   )
+}
+
+/** Colors the background of `element`, a part of the page; returns a function that puts it back */
+function highlight(element: HTMLElement, color: string) {
+  const before = element.style.backgroundColor
+  element.style.backgroundColor = color
+  return () => {
+    element.style.backgroundColor = before
+  }
+}
+
+/** Highlights a vacant calling's Name cell while mounted */
+function VacantCell({ nameCell }: { nameCell: HTMLElement }) {
+  useEffect(() => highlight(nameCell, vacantHighlight), [nameCell])
+  return null
+}
+
+/** The holder's status, in the page's Name cell, highlighting the cell in its color once picked */
+function HolderCell({ row, status, ...props }: HolderStatusFieldProps & { row: CallingRow }) {
+  const { nameCell } = row
+  useEffect(() => status && highlight(nameCell, highlightColor(status)), [nameCell, status])
+
+  return <HolderStatusField row={row} status={status} {...props} />
 }

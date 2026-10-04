@@ -28,7 +28,7 @@ export function demoConsiderations(): Consideration[] {
           member: holder ?? '',
           organization,
           position: considerations.length,
-          candidates: SEED_SHEET[key] ?? [],
+          ...SEED_SHEET[key] ?? { candidates: [] },
         })
       }
     }
@@ -37,7 +37,7 @@ export function demoConsiderations(): Consideration[] {
 }
 
 /** A row of the Considering tab, as the extension writes it (see src/background/sheets.ts) */
-function sheetRow({ key, calling, member, organization = [], position, candidates }: Consideration): string[] {
+function sheetRow({ key, calling, member, organization = [], position, candidates, holderStatus }: Consideration): string[] {
   return [
     key,
     calling,
@@ -49,6 +49,7 @@ function sheetRow({ key, calling, member, organization = [], position, candidate
     candidates.filter(c => c.status).map(c => `${c.id}: ${c.status ?? ''}`).join('\n'),
     organization.join(ORGANIZATION_SEPARATOR),
     position === undefined ? '' : String(position),
+    holderStatus ?? '',
   ]
 }
 

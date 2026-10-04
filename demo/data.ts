@@ -1,5 +1,5 @@
 import type { Member } from '../src/lcr/members'
-import type { Candidate } from '../src/shared/consideration'
+import type { Tracking } from '../src/shared/consideration'
 
 // Everyone here is made up, so the demo can be shared and committed, unlike
 // the saved LCR pages in resources/
@@ -157,26 +157,39 @@ export const rowKey = (calling: string, holder?: string, occurrence = 0) =>
   `${calling}|${holder ?? 'vacant'}|${String(occurrence)}`
 
 /** What the pretend shared sheet holds before anyone changes anything */
-export const SEED_SHEET: Record<string, Candidate[]> = {
-  [rowKey('Ward Assistant Clerk')]: [
-    { id: member('Sato, Kenji'), notes: 'Good with spreadsheets; works from home on Sundays.', status: 'Schedule for Interview' },
-  ],
-  [rowKey('Elders Quorum Secretary')]: [
-    { id: member('Lopez, Gabriel'), notes: 'Suggested by the EQ presidency.', status: 'Submitted by Presidency' },
-    { id: member('Parker, Jacob'), notes: '', status: 'Discussion' },
-  ],
-  [rowKey('Primary First Counselor')]: [
-    { id: member('Carter, Emily'), notes: 'Accepted on Tuesday.', status: 'Ready to sustain' },
-  ],
-  [rowKey('Nursery Leader')]: [
-    { id: member('Quinn, Rachel'), notes: '', status: 'Pray about' },
-    { id: member('Morgan, Eli'), notes: 'Could serve with Rachel.', status: 'Pray about' },
-  ],
-  [rowKey('Organist')]: [
-    { id: member('Young, Benjamin'), notes: 'Took piano lessons for 10 years.', status: 'Contacted for Interview' },
-  ],
-  [rowKey('Relief Society Secretary', member('Walker, Esther'))]: [
-    { id: member('Walker, Esther'), notes: 'Moving in December.', status: 'Need to release' },
-    { id: member('Ellis, Naomi'), notes: '' },
-  ],
+export const SEED_SHEET: Record<string, Tracking> = {
+  [rowKey('Ward Assistant Clerk')]: {
+    candidates: [
+      { id: member('Sato, Kenji'), notes: 'Good with spreadsheets; works from home on Sundays.', status: 'Schedule for Interview' },
+    ],
+  },
+  [rowKey('Elders Quorum Secretary')]: {
+    candidates: [
+      { id: member('Lopez, Gabriel'), notes: 'Suggested by the EQ presidency.', status: 'Submitted by Presidency' },
+      { id: member('Parker, Jacob'), notes: '', status: 'Discussion' },
+    ],
+  },
+  [rowKey('Primary First Counselor')]: {
+    candidates: [
+      { id: member('Carter, Emily'), notes: 'Accepted on Tuesday.', status: 'Ready to sustain' },
+    ],
+  },
+  [rowKey('Nursery Leader')]: {
+    candidates: [
+      { id: member('Quinn, Rachel'), notes: '', status: 'Pray about' },
+      { id: member('Morgan, Eli'), notes: 'Could serve with Rachel.', status: 'Pray about' },
+    ],
+  },
+  [rowKey('Organist')]: {
+    candidates: [
+      { id: member('Young, Benjamin'), notes: 'Took piano lessons for 10 years.', status: 'Contacted for Interview' },
+    ],
+  },
+  [rowKey('Relief Society Secretary', member('Walker, Esther'))]: {
+    candidates: [
+      { id: member('Walker, Esther'), notes: 'Moving in December.', status: 'Need to release' },
+      { id: member('Ellis, Naomi'), notes: '' },
+    ],
+    holderStatus: 'Considering Release',
+  },
 }

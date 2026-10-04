@@ -6,6 +6,8 @@ export const ROW_CLASS = 'callings-row'
 export const CALLING_CLASS_PREFIX = 'callings-calling-'
 /** Marks the element in each added cell that a row's field renders into, holding the row's key */
 export const SLOT = 'data-callings-slot'
+/** Marks the element added to each Name cell that the holder's status renders into, holding the row's key */
+export const HOLDER_SLOT = 'data-callings-holder-slot'
 
 /** Marks the cells this module adds, so they can be found and removed */
 const ADDED = 'data-callings-column'
@@ -27,6 +29,10 @@ export interface CallingRow {
   position: number
   /** element in the added cell to render the row's field into */
   slot: HTMLElement
+  /** the page's Name cell, which shows whoever holds the calling now */
+  nameCell: HTMLElement
+  /** element at the end of the Name cell to render the holder's status into */
+  holderSlot: HTMLElement
 }
 
 export function slugify(text: string): string {
@@ -84,7 +90,7 @@ export interface Enhancement {
 /**
  * Adds a Considering column after Name to every calling table on an LCR
  * organizations page, with an empty slot in each row for the caller to render
- * into, and classes to every row so callings can be hidden. Keeps doing so as
+ * into, another at the end of each Name cell, and classes to every row so callings can be hidden. Keeps doing so as
  * the page re-renders or loads more rows, calling `onApply` with the rows after
  * each pass; a row that's still on the page is the same object every time.
  */
@@ -128,10 +134,17 @@ export function enhancePage(doc: Document, onApply?: (rows: CallingRow[]) => voi
         slot.setAttribute(SLOT, key)
         cell.append(slot)
         name.after(cell)
-        rowFor.set(cell, { key, calling, member, organization: [], position: 0, slot })
+        const holderSlot = doc.createElement('div')
+        holderSlot.setAttribute(HOLDER_SLOT, key)
+        holderSlot.setAttribute(ADDED, '')
+        holderSlot.style.marginTop = '4px'
+        rowFor.set(cell, { key, calling, member, organization: [], position: 0, slot, nameCell: name as HTMLElement, holderSlot })
       }
       const row = rowFor.get(cell)
       if (row) {
+        // put back if the page re-rendered the cell's contents without it
+        if (row.holderSlot.parentElement !== name) name.append(row.holderSlot)
+        row.nameCell = name as HTMLElement
         // kept up to date on the same object, in case rows are added above it
         row.organization = organizations.get(tr.closest('table') ?? tr) ?? []
         row.position = found.length

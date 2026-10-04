@@ -3,7 +3,7 @@ import { type ReactNode, useCallback, useEffect, useState } from 'react'
 import { APP_NAME } from './constants'
 import type { ExtensionApi } from './content/api'
 import { COLUMN_TITLE } from './page/enhance'
-import type { Candidate } from './shared/consideration'
+import type { Tracking } from './shared/consideration'
 import { parseSpreadsheetId } from './shared/spreadsheet'
 import { Tracker } from './Tracker'
 
@@ -20,7 +20,7 @@ type State
   = | { step: 'starting' }
     | { step: 'setup' }
     | { step: 'connecting', spreadsheetId: string }
-    | { step: 'ready', spreadsheetId: string, values: Record<string, Candidate[]> }
+    | { step: 'ready', spreadsheetId: string, values: Record<string, Tracking> }
     | { step: 'failed', spreadsheetId: string, error: string }
 
 const message = (error: unknown) => error instanceof Error ? error.message : String(error)

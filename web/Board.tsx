@@ -1,9 +1,10 @@
-import { Alert, Anchor, Badge, Button, Group, Paper, SegmentedControl, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core'
+import { Alert, Anchor, Badge, Button, Group, Mark, Paper, SegmentedControl, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core'
 import { useCallback, useMemo, useState } from 'react'
 import type { SheetMember, SheetsClient } from '../src/background/sheets'
 import { CandidatesField, candidateName } from '../src/CandidatesField'
+import { HolderStatusField, VACANT_COLOR } from '../src/HolderStatusField'
 import { ShareLinkButton } from '../src/ShareLinkButton'
-import type { Candidate, Consideration } from '../src/shared/consideration'
+import { type Candidate, type Consideration, HOLDER_STATUS_COLORS, tracking } from '../src/shared/consideration'
 import { spreadsheetUrl } from '../src/shared/spreadsheet'
 import { type CallingInfo, useConsiderations } from '../src/useConsiderations'
 import { OrganizationPicker } from './OrganizationPicker'
@@ -39,9 +40,9 @@ export function Board({ api, spreadsheetId, rows: initialRows, members: initialM
   const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set())
   const [refreshing, setRefreshing] = useState(false)
 
-  const initial = useMemo(() => Object.fromEntries(initialRows.map(r => [r.key, r.candidates])), [initialRows])
+  const initial = useMemo(() => Object.fromEntries(initialRows.map(r => [r.key, tracking(r)])), [initialRows])
   const save = useCallback((consideration: Consideration) => api.save(spreadsheetId, consideration), [api, spreadsheetId])
-  const { values, change, flush, retry, replace, saving, unsaved, error, setError } = useConsiderations(initial, save)
+  const { values, change, changeHolderStatus, flush, retry, replace, saving, unsaved, error, setError } = useConsiderations(initial, save)
 
   const options = useMemo(() => members.map(m => ({ value: m.uuid, label: m.name })), [members])
   const names = useMemo(() => new Map(options.map(o => [o.value, o.label])), [options])
@@ -53,7 +54,7 @@ export function Board({ api, spreadsheetId, rows: initialRows, members: initialM
       const [rows, fresh] = await Promise.all([api.loadRows(spreadsheetId), api.loadMembers(spreadsheetId)])
       setCallings(rows)
       setMembers(fresh)
-      replace(Object.fromEntries(rows.map(r => [r.key, r.candidates])))
+      replace(Object.fromEntries(rows.map(r => [r.key, tracking(r)])))
       setError(undefined)
     }
     catch (e) {
@@ -81,11 +82,11 @@ export function Board({ api, spreadsheetId, rows: initialRows, members: initialM
 
   const query = search.trim().toLowerCase()
   const matches = ({ key, calling, member, organization: headings = [] }: CallingInfo) => {
-    const candidates = values[key] ?? NO_CANDIDATES
+    const { candidates = NO_CANDIDATES, holderStatus = '' } = values[key] ?? {}
     if (show === 'considering' && !candidates.length) return false
     if (show === 'vacant' && member) return false
     if (!query) return true
-    const text = [calling, ...headings, holderName(member) ?? 'vacant', ...candidates.flatMap(c => [candidateName(c.id, names, false), c.status ?? '', c.notes])]
+    const text = [calling, ...headings, holderName(member) ?? 'vacant', holderStatus, ...candidates.flatMap(c => [candidateName(c.id, names, false), c.status ?? '', c.notes])]
     return text.some(t => t.toLowerCase().includes(query))
   }
   const shown = organizations
@@ -170,28 +171,45 @@ export function Board({ api, spreadsheetId, rows: initialRows, members: initialM
               {group.name && <Title order={3} size="h5" c="dimmed">{group.name}</Title>}
               {/* three columns from iPad width, so more callings fit on screen */}
               <SimpleGrid cols={{ base: 1, xs: 2, sm: 3 }} spacing="xs" verticalSpacing="xs" style={{ alignItems: 'start' }}>
-                {group.rows.map(row => (
-                  <Paper key={row.key} withBorder radius="md" p="xs">
-                    <Stack gap={6}>
-                      <div>
-                        <Title order={4} size="h6" lh={1.3}>{row.calling}</Title>
-                        {row.member
-                          ? <Text size="xs" c="dimmed" truncate>{holderName(row.member)}</Text>
-                          : <Badge size="xs" variant="light" color="gray">Vacant</Badge>}
-                      </div>
-                      <CandidatesField
-                        row={row}
-                        candidates={values[row.key] ?? NO_CANDIDATES}
-                        options={options}
-                        names={names}
-                        loading={false}
-                        onChange={change}
-                        onDone={flush}
-                        size="md"
-                      />
-                    </Stack>
-                  </Paper>
-                ))}
+                {group.rows.map((row) => {
+                  const holder = holderName(row.member)
+                  const holderStatus = values[row.key]?.holderStatus
+                  return (
+                    <Paper key={row.key} withBorder radius="md" p="xs">
+                      <Stack gap={6}>
+                        <div>
+                          <Title order={4} size="h1" lh={1.3}>{row.calling}</Title>
+                          {holder
+                            ? (
+                                <Text size="lg" fw={500} c={holderStatus ? undefined : 'dimmed'} truncate>
+                                  {holderStatus ? <Mark color={HOLDER_STATUS_COLORS[holderStatus]} px={4}>{holder}</Mark> : holder}
+                                </Text>
+                              )
+                            : <Badge size="lg" variant="light" color={VACANT_COLOR}>Vacant</Badge>}
+                        </div>
+                        {holder && (
+                          <HolderStatusField
+                            row={row}
+                            holder={holder}
+                            status={holderStatus}
+                            onChange={changeHolderStatus}
+                            size="md"
+                          />
+                        )}
+                        <CandidatesField
+                          row={row}
+                          candidates={values[row.key]?.candidates ?? NO_CANDIDATES}
+                          options={options}
+                          names={names}
+                          loading={false}
+                          onChange={change}
+                          onDone={flush}
+                          size="md"
+                        />
+                      </Stack>
+                    </Paper>
+                  )
+                })}
               </SimpleGrid>
             </Stack>
           ))}

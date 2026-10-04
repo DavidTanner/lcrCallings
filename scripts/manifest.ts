@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { APP_NAME } from '../src/constants'
+import { APP_NAME } from '../src/constants.ts'
 
 export const LCR_MATCH = 'https://lcr.churchofjesuschrist.org/*'
 

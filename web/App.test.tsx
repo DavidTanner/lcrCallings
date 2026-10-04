@@ -125,6 +125,23 @@ describe('WebApp', () => {
     assert.ok(await screen.findByText(/All changes saved/))
   })
 
+  it('saves the holder\'s status, highlighting their name', async () => {
+    const auth = fakeAuth(true)
+    const api = fakeApi(auth)
+    renderApp(auth, api)
+    const field = await screen.findByLabelText<HTMLInputElement>('Status of Pratt, Orson as Bishop')
+    assert.equal(screen.queryByLabelText('Status of Vacant as Ward Clerk'), null)
+    assert.equal(screen.getByText('Pratt, Orson').closest('mark'), null)
+    fireEvent.click(field)
+    await click(await screen.findByRole('option', { name: 'Considering Release' }))
+    assert.deepEqual(api.saved, [{ key: 'Bishop|p1|0', calling: 'Bishop', member: 'p1', candidates: [], holderStatus: 'Considering Release' }])
+    assert.ok(screen.getByText('Pratt, Orson').closest('mark'))
+
+    fireEvent.change(screen.getByLabelText('Search'), { target: { value: 'release' } })
+    assert.ok(screen.getByText('Bishop'))
+    assert.equal(screen.queryByText('Ward Clerk'), null)
+  })
+
   it('filters by search and by what is being considered', async () => {
     const auth = fakeAuth(true)
     renderApp(auth, fakeApi(auth))

@@ -24,6 +24,21 @@ export type Status = typeof STATUSES[number]
 
 export const isStatus = (value: unknown): value is Status => STATUSES.includes(value as Status)
 
+/**
+ * Where whoever holds a calling now is, with the Mantine color their name is
+ * highlighted in once it's picked
+ */
+export const HOLDER_STATUS_COLORS = {
+  'Considering Release': 'orange',
+  'Fill/Change': 'red',
+} as const
+
+export type HolderStatus = keyof typeof HOLDER_STATUS_COLORS
+
+export const HOLDER_STATUSES = Object.keys(HOLDER_STATUS_COLORS) as HolderStatus[]
+
+export const isHolderStatus = (value: unknown): value is HolderStatus => HOLDER_STATUSES.includes(value as HolderStatus)
+
 /** Someone being considered for a calling */
 export interface Candidate {
   /**
@@ -37,8 +52,15 @@ export interface Candidate {
   status?: Status
 }
 
+/** What's tracked for one calling row: who is being considered, and where its current holder is */
+export interface Tracking {
+  candidates: Candidate[]
+  /** left out until one is picked, and for vacant callings */
+  holderStatus?: HolderStatus
+}
+
 /** Who is being considered for one calling row on the Organizations page */
-export interface Consideration {
+export interface Consideration extends Tracking {
   /** identifies the row across page loads: calling, current holder and occurrence */
   key: string
   calling: string
@@ -52,11 +74,10 @@ export interface Consideration {
   organization?: string[]
   /** Where the row is on the Organizations page, from 0; left out when not known */
   position?: number
-  candidates: Candidate[]
 }
 
 /** Just the fields of a consideration, for when `calling` may be a page row carrying more */
-export function consideration({ key, calling, member, organization, position }: Omit<Consideration, 'candidates'>, candidates: Candidate[]): Consideration {
+export function consideration({ key, calling, member, organization, position }: Omit<Consideration, keyof Tracking>, { candidates, holderStatus }: Tracking): Consideration {
   return {
     key,
     calling,
@@ -64,5 +85,9 @@ export function consideration({ key, calling, member, organization, position }: 
     ...(organization ? { organization } : {}),
     ...(position === undefined ? {} : { position }),
     candidates,
+    ...(holderStatus ? { holderStatus } : {}),
   }
 }
+
+/** Just what's tracked of a consideration */
+export const tracking = ({ candidates, holderStatus }: Tracking): Tracking => ({ candidates, ...(holderStatus ? { holderStatus } : {}) })

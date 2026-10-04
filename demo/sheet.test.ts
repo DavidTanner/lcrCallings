@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { describe, it } from 'node:test'
-import { candidatesIn, HEADER, MEMBERS_HEADER, placementIn } from '../src/background/sheets'
+import { HEADER, MEMBERS_HEADER, placementIn, trackingIn } from '../src/background/sheets'
 import { enhancePage } from '../src/page/enhance'
 import type { Consideration } from '../src/shared/consideration'
 import { MEMBERS, ORGANIZATIONS, SEED_SHEET } from './data'
@@ -54,8 +54,8 @@ describe('demo sheet', () => {
     const files = demoSheetCsv()
     const [header, ...rows] = parseCsv(files['Considering.csv'] ?? '')
     assert.deepEqual(header, HEADER)
-    const read = new Map(rows.map(row => [row[0], candidatesIn(row)]))
-    for (const [key, candidates] of Object.entries(SEED_SHEET)) assert.deepEqual(read.get(key), candidates)
+    const read = new Map(rows.map(row => [row[0], trackingIn(row)]))
+    for (const [key, tracked] of Object.entries(SEED_SHEET)) assert.deepEqual(read.get(key), tracked)
     assert.deepEqual(rows.map(placementIn), demoConsiderations().map(({ organization, position }) => ({ organization, position })))
 
     const [membersHeader, ...members] = parseCsv(files['Members.csv'] ?? '')

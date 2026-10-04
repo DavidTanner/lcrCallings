@@ -1,14 +1,14 @@
 import { fetchMemberList } from '../lcr/memberList'
 import type { Member } from '../lcr/members'
-import type { Candidate, Consideration } from '../shared/consideration'
+import type { Consideration, Tracking } from '../shared/consideration'
 import type { BackgroundRequest, BackgroundResponses, Result } from '../shared/messages'
 
 /** What the panel needs from the extension, so it can be tested without Chrome */
 export interface ExtensionApi {
   getSpreadsheetId: () => Promise<string | undefined>
   setSpreadsheetId: (id: string) => Promise<void>
-  /** key → who is being considered */
-  load: (spreadsheetId: string) => Promise<Record<string, Candidate[]>>
+  /** key → who is being considered, and where the holder is */
+  load: (spreadsheetId: string) => Promise<Record<string, Tracking>>
   save: (spreadsheetId: string, consideration: Consideration) => Promise<void>
   /** Adds a row for each calling not in the sheet yet; returns how many were added */
   sync: (spreadsheetId: string, considerations: Consideration[]) => Promise<number>

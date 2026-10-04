@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { candidatesIn, createSheetsClient, HEADER, MEMBERS_TITLE, placementIn, SHEET_TITLE, type TokenProvider } from './sheets'
+import { candidatesIn, createSheetsClient, HEADER, MEMBERS_TITLE, placementIn, SHEET_TITLE, type TokenProvider, trackingIn } from './sheets'
 
 const ID = 'sheet1'
 const RANGE = encodeURIComponent(`'${SHEET_TITLE}'!`)
@@ -20,9 +20,9 @@ function fakeGoogle({ tabs = [SHEET_TITLE], rows = [HEADER] as string[][], membe
     if (forced) return reply({ error: { message: `status ${String(forced)}` } }, forced)
     if (url.endsWith('?fields=sheets.properties.title')) return reply({ sheets: tabs.map(title => ({ properties: { title } })) })
     if (url.includes(`${RANGE}A%3AA`)) return reply({ values: rows.map(([key = '']) => [key]) })
-    if (url.includes(`${RANGE}A1%3AJ1`)) return reply({ values: rows.slice(0, 1) })
-    if (url.includes(`${RANGE}A2%3AJ`)) return reply({ values: rows.slice(1) })
-    if (method === 'GET' && url.endsWith(`${RANGE}A%3AJ`)) return reply({ values: rows })
+    if (url.includes(`${RANGE}A1%3AK1`)) return reply({ values: rows.slice(0, 1) })
+    if (url.includes(`${RANGE}A2%3AK`)) return reply({ values: rows.slice(1) })
+    if (method === 'GET' && url.endsWith(`${RANGE}A%3AK`)) return reply({ values: rows })
     if (url.endsWith(`${MEMBERS_RANGE}A2%3AB`)) return reply({ values: members })
     return reply({})
   }
@@ -44,6 +44,7 @@ const consideration = {
   member: 'p1',
   organization: ['Bishopric'],
   position: 0,
+  holderStatus: 'Considering Release' as const,
   candidates: [
     { id: 'm1', notes: 'Available after June' },
     { id: 'm2', notes: '', status: 'Pray about' as const },
@@ -51,11 +52,18 @@ const consideration = {
 }
 
 describe('createSheetsClient', () => {
-  it('loads candidates by key', async () => {
+  it('loads candidates and holder statuses by key', async () => {
     const data = JSON.stringify(consideration.candidates)
-    const google = fakeGoogle({ rows: [HEADER, ['a', 'Bishop', '', 'X', '', '', data], ['b', 'Clerk'], ['c', 'Clerk', '', 'Y'], ['a', 'Bishop', '', 'Z', '', '', '[]']] })
+    const google = fakeGoogle({ rows: [HEADER, ['a', 'Bishop', '', 'X', '', '', data], ['b', 'Clerk'], ['c', 'Clerk', '', 'Y', '', '', '', '', '', '', 'Considering Release'], ['a', 'Bishop', '', 'Z', '', '', '[]']] })
     const values = await createSheetsClient(tokens(), google.fetchFn).load(ID)
-    assert.deepEqual(values, { a: [], b: [], c: [{ id: 'text:Y', notes: '' }] })
+    assert.deepEqual(values, { a: { candidates: [] }, b: { candidates: [] }, c: { candidates: [{ id: 'text:Y', notes: '' }], holderStatus: 'Considering Release' } })
+  })
+
+  it('ignores holder statuses that are not on the list', () => {
+    const cells = (status: string) => ['k', 'Bishop', 'p1', '', '', '', '', '', '', '', status]
+    assert.deepEqual(trackingIn(cells(' Considering Release ')), { candidates: [], holderStatus: 'Considering Release' })
+    assert.deepEqual(trackingIn(cells('Maybe')), { candidates: [] })
+    assert.deepEqual(trackingIn(['k', 'Bishop']), { candidates: [] })
   })
 
   it('reads candidates from Data, or else the member ids or free text in Considering', () => {
@@ -106,9 +114,9 @@ describe('createSheetsClient', () => {
     await createSheetsClient(tokens(), google.fetchFn).save(ID, consideration)
     const write = google.calls.at(-1)
     assert.equal(write?.method, 'PUT')
-    assert.match(write.url, new RegExp(`^${ID}/values/${RANGE}A3%3AJ3\\?valueInputOption=RAW$`))
-    const [key, calling, member, considering, , notes, data, status, organization, position] = (write.body as { values: string[][] }).values[0] ?? []
-    assert.deepEqual([key, calling, member, considering, notes, status, organization, position], ['Bishop|p1|0', 'Bishop', 'p1', 'm1\nm2', 'm1: Available after June', 'm2: Pray about', 'Bishopric', 0])
+    assert.match(write.url, new RegExp(`^${ID}/values/${RANGE}A3%3AK3\\?valueInputOption=RAW$`))
+    const [key, calling, member, considering, , notes, data, status, organization, position, holderStatus] = (write.body as { values: string[][] }).values[0] ?? []
+    assert.deepEqual([key, calling, member, considering, notes, status, organization, position, holderStatus], ['Bishop|p1|0', 'Bishop', 'p1', 'm1\nm2', 'm1: Available after June', 'm2: Pray about', 'Bishopric', 0, 'Considering Release'])
     assert.deepEqual(JSON.parse(data ?? ''), consideration.candidates)
   })
 
@@ -117,7 +125,7 @@ describe('createSheetsClient', () => {
     await createSheetsClient(tokens(), google.fetchFn).save(ID, consideration)
     const write = google.calls.at(-1)
     assert.equal(write?.method, 'POST')
-    assert.match(write.url, /A%3AJ:append\?valueInputOption=RAW&insertDataOption=INSERT_ROWS$/)
+    assert.match(write.url, /A%3AK:append\?valueInputOption=RAW&insertDataOption=INSERT_ROWS$/)
   })
 
   it('appends rows for keys not in the sheet yet in one request', async () => {
@@ -127,9 +135,9 @@ describe('createSheetsClient', () => {
     assert.equal(added, 1)
     const writes = google.calls.filter(c => c.method !== 'GET')
     assert.equal(writes.length, 1)
-    assert.match(writes[0]?.url ?? '', /A%3AJ:append\?valueInputOption=RAW&insertDataOption=INSERT_ROWS$/)
-    const [[key, calling, member, considering, , notes, data, status, organization, position] = []] = (writes[0]?.body as { values: string[][] }).values
-    assert.deepEqual([key, calling, member, considering, notes, data, status, organization, position], ['Ward Clerk|vacant|0', 'Ward Clerk', '', '', '', '', '', '', ''])
+    assert.match(writes[0]?.url ?? '', /A%3AK:append\?valueInputOption=RAW&insertDataOption=INSERT_ROWS$/)
+    const [[key, calling, member, considering, , notes, data, status, organization, position, holderStatus] = []] = (writes[0]?.body as { values: string[][] }).values
+    assert.deepEqual([key, calling, member, considering, notes, data, status, organization, position, holderStatus], ['Ward Clerk|vacant|0', 'Ward Clerk', '', '', '', '', '', '', '', ''])
   })
 
   it('writes nothing when every key is already in the sheet, where the page has it', async () => {

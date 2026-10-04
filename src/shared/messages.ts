@@ -1,5 +1,5 @@
 import type { SheetMember } from '../background/sheets'
-import type { Candidate, Consideration } from './consideration'
+import type { Consideration, Tracking } from './consideration'
 
 /** Messages the content script sends the background service worker */
 export type BackgroundRequest
@@ -9,8 +9,8 @@ export type BackgroundRequest
     | { type: 'saveMembers', spreadsheetId: string, members: SheetMember[] }
 
 export interface BackgroundResponses {
-  /** key → who is being considered */
-  load: Record<string, Candidate[]>
+  /** key → who is being considered, and where the holder is */
+  load: Record<string, Tracking>
   save: null
   /** how many rows were added */
   sync: number

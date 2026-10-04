@@ -1,6 +1,6 @@
 import type { ExtensionApi } from '../src/content/api'
 import type { Member } from '../src/lcr/members'
-import type { Candidate, Consideration } from '../src/shared/consideration'
+import { type Consideration, type Tracking, tracking } from '../src/shared/consideration'
 
 export const MEMBERS: Member[] = [
   { uuid: 'm1', name: 'Abel, Bea', nameSort: 'ABEL, BEA' },
@@ -10,7 +10,7 @@ export const MEMBERS: Member[] = [
 
 export interface FakeApiOptions {
   spreadsheetId?: string
-  sheet?: Record<string, Candidate[]>
+  sheet?: Record<string, Tracking>
   members?: Member[]
 }
 
@@ -18,7 +18,7 @@ export interface FakeApiOptions {
 export function fakeApi({ spreadsheetId, sheet = {}, members = MEMBERS }: FakeApiOptions = {}) {
   const saved: Consideration[] = []
   const synced: Consideration[] = []
-  const api: ExtensionApi & { saved: Consideration[], synced: Consideration[], sheet: Record<string, Candidate[]>, failWith?: string, membersFailWith?: string, savedMembers?: Member[] } = {
+  const api: ExtensionApi & { saved: Consideration[], synced: Consideration[], sheet: Record<string, Tracking>, failWith?: string, membersFailWith?: string, savedMembers?: Member[] } = {
     saved,
     synced,
     sheet,
@@ -31,7 +31,7 @@ export function fakeApi({ spreadsheetId, sheet = {}, members = MEMBERS }: FakeAp
     save: (_id, consideration) => {
       if (api.failWith) return Promise.reject(new Error(api.failWith))
       saved.push(consideration)
-      api.sheet[consideration.key] = consideration.candidates
+      api.sheet[consideration.key] = tracking(consideration)
       return Promise.resolve()
     },
     sync: (_id, considerations) => {
@@ -39,7 +39,7 @@ export function fakeApi({ spreadsheetId, sheet = {}, members = MEMBERS }: FakeAp
       const missing = considerations.filter(c => !(c.key in api.sheet))
       for (const c of missing) {
         synced.push(c)
-        api.sheet[c.key] = c.candidates
+        api.sheet[c.key] = tracking(c)
       }
       return Promise.resolve(missing.length)
     },
