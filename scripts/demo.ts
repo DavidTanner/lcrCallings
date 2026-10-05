@@ -6,7 +6,7 @@ import { copyFile, mkdir, rm } from 'node:fs/promises'
 // pretend sheet and made-up members, so the extension can be shown without
 // Chrome, Google sign-in or real member data. Rebuilds on each page load.
 // `--build` builds it into public/demo/ instead, to publish alongside the
-// web page (run it after web:build, which empties public/).
+// web page (run it after site:build, which empties public/).
 const build = process.argv.includes('--build')
 const outdir = 'public/demo'
 

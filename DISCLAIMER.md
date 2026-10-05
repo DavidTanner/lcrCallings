@@ -17,7 +17,7 @@ The following definitions shall have the same meaning regardless of whether they
 <p><strong>You</strong> means the individual accessing the Service, or the company, or other legal entity on behalf of which such individual is accessing or using the Service, as applicable.</p>
 </li>
 <li>
-<p><strong>Website</strong> refers to LCR Callings, accessible from <a href="https://davidtanner.github.io/lcrcallings" rel="external nofollow noopener" target="_blank">https://davidtanner.github.io/lcrcallings</a>.</p>
+<p><strong>Website</strong> refers to LCR Callings, accessible from <a href="https://lcrcallings.click/" rel="external nofollow noopener" target="_blank">https://lcrcallings.click/</a>.</p>
 </li>
 </ul>
 <h2>Disclaimer</h2>

@@ -1,0 +1,38 @@
+<script>
+  // Links shared before the web app moved to /app/ still carry ?sheet=
+  if (new URLSearchParams(location.search).has('sheet')) location.replace('/app/' + location.search)
+</script>
+<section class="hero">
+  <img src="/icon-128.png" alt="" width="96" height="96">
+  <h1>{{appName}}</h1>
+  <p class="lede">Track who is being considered for each calling in your ward or stake, right on the Organizations page in Leader and Clerk Resources (LCR), in a Google Sheet your leaders share.</p>
+  <div class="actions">
+    {{storeLink}}
+    <a class="button" href="/app/">Open the web app</a>
+    <a class="button secondary" href="/demo/">Try the demo</a>
+  </div>
+</section>
+
+<h2>What {{appName}} does</h2>
+<ul>
+  <li><strong>A Considering column in LCR.</strong> The {{appName}} Chrome extension adds a column to LCR's Organizations page. For each calling, pick the members being considered, set where each one is in the process (Submitted by Presidency, Discussion, … Sustained, Released) and keep notes.</li>
+  <li><strong>Shared through Google Sheets.</strong> Everything is saved to a Google Sheet that you choose and share with the leaders you work with, so everyone sees the same list. <strong>Sync all callings</strong> adds every calling on the page to the sheet.</li>
+  <li><strong>A web app for iPads and phones.</strong> For leaders who can't install a Chrome extension, the <a href="/app/">web app</a> shows every calling in the sheet, grouped by organization as in LCR, and lets them make the same changes.</li>
+</ul>
+
+<h2>How to use it</h2>
+<ol>
+  <li>Create a Google Sheet and share it with the leaders who should see it.</li>
+  <li>Open the Organizations page in LCR and click the {{appName}} toolbar button, or open the <a href="/app/">web app</a>.</li>
+  <li>Paste the link to the sheet and sign in with Google.</li>
+  <li>Pick candidates, statuses and notes for each calling. They save to the sheet right away, and others see them when they refresh.</li>
+</ol>
+<p>The <a href="/demo/">demo</a> shows the extension on a mock Organizations page with made-up members, without signing in to anything.</p>
+
+<h2>Google sign-in and your data</h2>
+<p>{{appName}} asks you to sign in with Google only so it can read and write the one Google Sheet you choose, through the Google Sheets API (the <code>https://www.googleapis.com/auth/spreadsheets</code> permission). It doesn't ask for your name, email address or any other Google data.</p>
+<p>{{appName}} has no server, database, analytics or ads. Data goes directly between your browser, your Google Sheet and LCR, using your own accounts, and is never sent to the developer or anyone else. See the <a href="/privacy/">Privacy Policy</a> for exactly what is accessed and how, and the <a href="/terms/">Terms of Service</a>.</p>
+
+<div class="note">
+  <p>{{appName}} is an independent, open-source project (<a href="https://github.com/DavidTanner/lcrCallings">source code</a>). It is not made, endorsed or supported by The Church of Jesus Christ of Latter-day Saints, which provides Leader and Clerk Resources.</p>
+</div>
