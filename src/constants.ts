@@ -1,4 +1,4 @@
-export const APP_NAME = 'Callings'
+export const APP_NAME = 'LCR Callings'
 
 /** id of the element the panel attaches its shadow root to */
 export const HOST_ID = 'callings-extension-host'

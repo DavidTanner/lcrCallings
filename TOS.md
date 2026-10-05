@@ -29,7 +29,7 @@
 <p><strong>Third-Party Social Media Service</strong> means any services or content (including data, information, products or services) provided by a third party that is displayed, included, made available, or linked to through the Service.</p>
 </li>
 <li>
-<p><strong>Website</strong> refers to LCR Callings, accessible from <a href="https://davidtanner.github.io/lcrCallings/" rel="external nofollow noopener" target="_blank">https://davidtanner.github.io/lcrCallings/</a></p>
+<p><strong>Website</strong> refers to LCR Callings, accessible from <a href="https://lcrcallings.click/" rel="external nofollow noopener" target="_blank">https://lcrcallings.click/</a></p>
 </li>
 <li>
 <p><strong>You</strong> means the individual accessing or using the Service, or the company, or other legal entity on behalf of which such individual is accessing or using the Service, as applicable.</p>
@@ -40,7 +40,7 @@
 <p>Your access to and use of the Service is conditioned on Your acceptance of and compliance with these Terms and Conditions. These Terms and Conditions apply to all visitors, users and others who access or use the Service.</p>
 <p>By accessing or using the Service You agree to be bound by these Terms and Conditions. If You disagree with any part of these Terms and Conditions then You may not access the Service.</p>
 <p>You represent that you are over the age of 18. The Company does not permit those under 18 to use the Service.</p>
-<p>Your access to and use of the Service is also subject to Our Privacy Policy, which describes how We collect, use, and disclose personal information. Please read Our Privacy Policy carefully before using Our Service.</p>
+<p>Your access to and use of the Service is also subject to Our <a href="https://lcrcallings.click/privacy/">Privacy Policy</a>, which describes how We collect, use, and disclose personal information. Please read Our Privacy Policy carefully before using Our Service.</p>
 <h2>Links to Other Websites</h2>
 <p>Our Service may contain links to third-party websites or services that are not owned or controlled by the Company.</p>
 <p>The Company has no control over, and assumes no responsibility for, the content, privacy policies, or practices of any third-party websites or services. You further acknowledge and agree that the Company shall not be responsible or liable, directly or indirectly, for any damage or loss caused or alleged to be caused by or in connection with the use of or reliance on any such content, goods or services available on or through any such websites or services.</p>

@@ -1,4 +1,4 @@
-import { Alert, Button, Container, Group, Loader, Stack, Text, TextInput, Title } from '@mantine/core'
+import { Alert, Anchor, Button, Container, Group, Loader, Stack, Text, TextInput, Title } from '@mantine/core'
 import { type ReactNode, useCallback, useEffect, useState } from 'react'
 import type { SheetMember } from '../src/background/sheets'
 import { APP_NAME } from '../src/constants'
@@ -149,6 +149,11 @@ export function WebApp({ auth, api, spreadsheetId: initialId, onSpreadsheetId, p
           )}
         </Group>
         {body}
+        <Group component="footer" gap="md" mt="xl">
+          <Anchor href="/" size="sm" c="dimmed">{`About ${APP_NAME}`}</Anchor>
+          <Anchor href="/privacy/" size="sm" c="dimmed">Privacy Policy</Anchor>
+          <Anchor href="/terms/" size="sm" c="dimmed">Terms of Service</Anchor>
+        </Group>
       </Stack>
     </Container>
   )

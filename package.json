@@ -15,7 +15,8 @@
     "demo:sheet": "tsx scripts/demo-sheet.ts",
     "web": "tsx scripts/web.ts --serve",
     "web:build": "tsx scripts/web.ts",
-    "pages:build": "npm run web:build && npm run demo:build",
+    "site:build": "tsx scripts/site.ts",
+    "pages:build": "npm run site:build && npm run web:build && npm run demo:build",
     "keygen": "tsx scripts/keygen.ts",
     "store:publish": "tsx scripts/publish.ts",
     "members": "tsx scripts/members.ts",
@@ -48,6 +49,7 @@
     "globals": "^17.12.0",
     "jiti": "^2.7.0",
     "jsdom": "^30.1.1",
+    "marked": "^18.0.14",
     "tsx": "^4.23.15",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.70.1"

@@ -3,10 +3,11 @@ import { existsSync } from 'node:fs'
 import { copyFile, mkdir, rm } from 'node:fs/promises'
 
 // Builds web/, a page for people who can't install the extension (e.g. on an
-// iPad), into public/ for GitHub Pages. `--serve` serves it on 127.0.0.1
-// instead, rebuilding on each page load.
+// iPad), into public/app/ for GitHub Pages, after site:build (which empties
+// public/). `--serve` serves it on 127.0.0.1 instead, rebuilding on each page
+// load.
 const serve = process.argv.includes('--serve')
-const outdir = 'public'
+const outdir = 'public/app'
 
 // WEB_OAUTH_CLIENT_ID (and optionally SPREADSHEET_ID) can live in .env
 // (git-ignored), or come from CI variables
@@ -36,7 +37,7 @@ const options: esbuild.BuildOptions = {
 }
 
 await rm(outdir, { recursive: true, force: true })
-await mkdir(outdir)
+await mkdir(outdir, { recursive: true })
 await copyFile('web/index.html', `${outdir}/index.html`)
 await copyFile('icons/icon-128.png', `${outdir}/icon-128.png`)
 
@@ -44,9 +45,9 @@ if (serve) {
   const host = '127.0.0.1'
   const ctx = await esbuild.context({ ...options, write: false })
   await ctx.serve({ servedir: outdir, host, port: 8002 })
-  console.log(`Web page running at http://${host}:8002}/ (add it to the OAuth client's JavaScript origins to sign in)`)
+  console.log(`Web page running at http://${host}:8002/ (add it to the OAuth client's JavaScript origins to sign in)`)
 }
 else {
   await esbuild.build(options)
-  console.log(`Built ${outdir}/. Host it on GitHub Pages (see .github/workflows/ci.yml) or any static host.`)
+  console.log(`Built ${outdir}/. Host it on GitHub Pages (see .github/workflows/deploy.yml) or any static host.`)
 }
