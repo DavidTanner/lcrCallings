@@ -169,8 +169,8 @@ export function Board({ api, spreadsheetId, rows: initialRows, members: initialM
           {groups.map(group => (
             <Stack key={group.name} gap={6}>
               {group.name && <Title order={3} size="h5" c="dimmed">{group.name}</Title>}
-              {/* three columns from iPad width, so more callings fit on screen */}
-              <SimpleGrid cols={{ base: 1, xs: 2, sm: 3 }} spacing="xs" verticalSpacing="xs" style={{ alignItems: 'start' }}>
+              {/* up to six columns on a desktop, so more callings fit on screen */}
+              <SimpleGrid cols={{ base: 1, xs: 2, sm: 3, md: 4, lg: 5, xl: 6, xxl: 7 }} spacing="xs" verticalSpacing="xs" style={{ alignItems: 'start' }}>
                 {group.rows.map((row) => {
                   const holder = holderName(row.member)
                   const holderStatus = values[row.key]?.holderStatus
