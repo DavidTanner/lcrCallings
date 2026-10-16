@@ -1,9 +1,8 @@
-import { Alert, Anchor, Button, Container, Group, Loader, Stack, Text, TextInput, Title } from '@mantine/core'
+import { Alert, Anchor, Button, Container, Group, Loader, Stack, Text, Title } from '@mantine/core'
 import { type ReactNode, useCallback, useEffect, useState } from 'react'
-import type { SheetMember } from '../src/background/sheets'
+import { needsAccess, type SheetMember } from '../src/background/sheets'
 import { APP_NAME } from '../src/constants'
 import type { Consideration } from '../src/shared/consideration'
-import { parseSpreadsheetId } from '../src/shared/spreadsheet'
 import { Board, type WebApi } from './Board'
 import { type GoogleAuth, SignInRequired } from './google'
 
@@ -16,18 +15,24 @@ export interface WebAppProps {
   onSpreadsheetId: (id: string | undefined) => void
   /** this page's address, to share links to it */
   pageUrl: string
+  /**
+   * Shows Google's file picker, on just `spreadsheetId` if given; resolves
+   * with the sheet chosen, or undefined if cancelled. Needs to be signed in.
+   */
+  pickSheet: (spreadsheetId?: string) => Promise<string | undefined>
 }
 
 type State
   = | { step: 'signIn', error?: string }
     | { step: 'loading' }
+    | { step: 'needsAccess', error?: string }
     | { step: 'ready', rows: Consideration[], members: SheetMember[] }
     | { step: 'failed', error: string }
 
 const message = (error: unknown) => error instanceof Error ? error.message : String(error)
 
 /** The page for people who can't install the extension: the sheet's callings, editable */
-export function WebApp({ auth, api, spreadsheetId: initialId, onSpreadsheetId, pageUrl }: WebAppProps) {
+export function WebApp({ auth, api, spreadsheetId: initialId, onSpreadsheetId, pageUrl, pickSheet }: WebAppProps) {
   const [spreadsheetId, setSpreadsheetId] = useState(initialId)
   const [state, setState] = useState<State>(() => auth.isSignedIn() ? { step: 'loading' } : { step: 'signIn' })
 
@@ -38,7 +43,8 @@ export function WebApp({ auth, api, spreadsheetId: initialId, onSpreadsheetId, p
       return { step: 'ready', rows, members }
     }
     catch (error) {
-      return error instanceof SignInRequired ? { step: 'signIn' } : { step: 'failed', error: message(error) }
+      if (error instanceof SignInRequired) return { step: 'signIn' }
+      return needsAccess(error) ? { step: 'needsAccess' } : { step: 'failed', error: message(error) }
     }
   }, [api])
 
@@ -76,6 +82,24 @@ export function WebApp({ auth, api, spreadsheetId: initialId, onSpreadsheetId, p
     onSpreadsheetId(id)
   }
 
+  /** Signs in if need be, then lets them choose the sheet in Google's picker */
+  const choose = async (id?: string) => {
+    await ensureSignedIn()
+    const picked = await pickSheet(id)
+    if (!picked) return
+    if (picked === spreadsheetId) await load(picked)
+    else changeSheet(picked)
+  }
+
+  const chooseAgain = async (id: string) => {
+    try {
+      await choose(id)
+    }
+    catch (error) {
+      setState({ step: 'needsAccess', error: message(error) })
+    }
+  }
+
   const signOut = () => {
     auth.signOut()
     setState({ step: 'signIn' })
@@ -83,7 +107,7 @@ export function WebApp({ auth, api, spreadsheetId: initialId, onSpreadsheetId, p
 
   let body: ReactNode
   if (!spreadsheetId) {
-    body = <Setup onConnect={changeSheet} />
+    body = <Setup onChoose={() => choose()} />
   }
   else {
     switch (state.step) {
@@ -102,6 +126,17 @@ export function WebApp({ auth, api, spreadsheetId: initialId, onSpreadsheetId, p
             <Loader size="sm" />
             <Text>Loading the sheet…</Text>
           </Group>
+        )
+        break
+      case 'needsAccess':
+        body = (
+          <Stack gap="sm" align="flex-start">
+            <Text>
+              {`Google lets ${APP_NAME} open only the sheets you choose for it. Choose this sheet to open it. If it isn't there, ask whoever shared the link to share the sheet with this Google account.`}
+            </Text>
+            {state.error && <Alert color="red" p="sm">{state.error}</Alert>}
+            <Button size="md" onClick={() => void chooseAgain(spreadsheetId)}>Choose the sheet</Button>
+          </Stack>
         )
         break
       case 'failed':
@@ -159,34 +194,24 @@ export function WebApp({ auth, api, spreadsheetId: initialId, onSpreadsheetId, p
   )
 }
 
-function Setup({ onConnect }: { onConnect: (spreadsheetId: string) => void }) {
-  const [url, setUrl] = useState('')
+function Setup({ onChoose }: { onChoose: () => Promise<void> }) {
   const [error, setError] = useState<string>()
 
+  const choose = async () => {
+    setError(undefined)
+    try {
+      await onChoose()
+    }
+    catch (e) {
+      setError(message(e))
+    }
+  }
+
   return (
-    <form
-      onSubmit={(event) => {
-        event.preventDefault()
-        const id = parseSpreadsheetId(url)
-        if (id) onConnect(id)
-        else setError('Paste the link to a Google Sheet')
-      }}
-    >
-      <Stack gap="sm">
-        <TextInput
-          size="md"
-          label="Google Sheet"
-          description="Paste the link to the sheet the extension saves to."
-          placeholder="https://docs.google.com/spreadsheets/d/…"
-          value={url}
-          error={error}
-          onChange={(event) => {
-            setUrl(event.currentTarget.value)
-            setError(undefined)
-          }}
-        />
-        <Button size="md" type="submit">Open</Button>
-      </Stack>
-    </form>
+    <Stack gap="sm" align="flex-start">
+      <Text>Choose the Google Sheet the extension saves to. It needs to be shared with your Google account.</Text>
+      {error && <Alert color="red" p="sm">{error}</Alert>}
+      <Button size="md" onClick={() => void choose()}>Choose a Google Sheet</Button>
+    </Stack>
   )
 }

@@ -1,6 +1,6 @@
 # Privacy Policy
 
-_Last updated: October 4, 2026_
+_Last updated: October 16, 2026_
 
 This policy covers **LCR Callings**: the LCR Callings Chrome extension and the
 LCR Callings web app at [https://lcrcallings.click/](https://lcrcallings.click/)
@@ -23,16 +23,17 @@ accesses, how it uses it, and the choices you have.
 ### Your Google account
 
 When you sign in with Google, the app asks for one permission: the Google
-Sheets API scope `https://www.googleapis.com/auth/spreadsheets`, which Google
-describes as "See, edit, create and delete all your Google Sheets
-spreadsheets". The app uses it **only for the single Google Sheet whose link
-you give it**. It never lists, opens, creates or deletes any other
-spreadsheet.
+Drive scope `https://www.googleapis.com/auth/drive.file`, which Google
+describes as "See, edit, create, and delete only the specific Google Drive
+files you use with this app". With it, the app can open **only the Google
+Sheet you choose for it in Google's own file picker**; Google keeps it from
+seeing any other file in your Google Drive. The app reads and writes that
+sheet through the Google Sheets API. It never creates or deletes files.
 
 The app does not ask for, and does not receive, your name, email address,
-profile picture, contacts, Google Drive files or any other Google account
-data. Google gives the app a temporary access token, which the app uses only
-to call the Google Sheets API.
+profile picture, contacts, any other Google Drive file or any other Google
+account data. Google gives the app a temporary access token, which the app
+uses only to show Google's file picker and to call the Google Sheets API.
 
 ### The Google Sheet you choose
 
@@ -87,7 +88,8 @@ It does not use the information for any other purpose.
 The app does not sell, rent, share or transfer your information to anyone.
 The only places data is sent are:
 
-- **Google**, through the Google Sheets API, to read and write your sheet.
+- **Google**, through the Google Sheets API, to read and write your sheet,
+  and through Google's file picker, which you use to choose it.
   Who else can see the sheet is decided by the sheet's own sharing settings
   in Google Drive, which you control.
 - **LCR**, to read the Organizations and Member List pages you already have

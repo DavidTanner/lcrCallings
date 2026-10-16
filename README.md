@@ -17,7 +17,9 @@ https://lcrcallings.click/disclaimer/.
 
 1. Open the Organizations page in LCR and click the extension's toolbar button.
 2. The first time, paste the link to a Google Sheet shared with everyone who
-   should see the column, and approve Google sign-in.
+   should see the column, and approve Google sign-in. The extension can only
+   open sheets you've chosen for it (see [Sheet access](#sheet-access)), so
+   the first time it opens the [web page](#web-page) to choose it there.
 3. In the **Considering** column, pick members for each calling, then set
    each one's status (Submitted by Presidency, Discussion, … Sustained,
    Released, …) and add notes in the fields that appear under them. Picks and
@@ -59,6 +61,24 @@ row (e.g. `callings-calling-elders-quorum-teacher`), so callings can be hidden
 with CSS. Clicking the toolbar button again, or the ×, removes everything it
 added to the page.
 
+## Sheet access
+
+The app asks only for the `drive.file` scope, which Google doesn't need to
+verify, rather than `spreadsheets`, which would let it into every sheet the
+user has. With `drive.file`, Google lets it open only files each user has
+chosen for it in [Google's file picker](https://developers.google.com/drive/picker/guides/overview),
+so everyone who uses a sheet chooses it once. Until they do, the Sheets API
+answers 403 or 404, as it does for a sheet that isn't shared with them, and
+both the web page and the extension ask them to choose it.
+
+Chrome extensions can't load the picker's script, so the extension opens the
+[web page](#web-page) on the sheet (`?sheet=…`), which shows the picker on
+just that sheet (`setFileIds`). Access is granted to the Google Cloud project
+(the picker's `setAppId`, the project number, which the page takes from the
+start of its OAuth client id), so the extension's own tokens can open the
+sheet too, as long as both sign in to the same Google account. The panel
+connects again when its tab is shown again.
+
 ## Setup
 
 Google only issues tokens to an OAuth client tied to the extension's id, so:
@@ -66,7 +86,7 @@ Google only issues tokens to an OAuth client tied to the extension's id, so:
 1. `npm run keygen` adds `EXTENSION_KEY` to `.env` (git-ignored) and prints
    the extension id. The key keeps the id the same wherever it's loaded.
 2. In [Google Cloud Console](https://console.cloud.google.com/), in a project:
-   - enable the **Google Sheets API**
+   - enable the **Google Sheets API** and the **Google Picker API**
    - configure the **OAuth consent screen** (External, Testing) and add each
      user's Google account as a test user. Tokens for apps in Testing expire
      after 7 days, so users will occasionally re-approve.
@@ -102,7 +122,9 @@ last, under **Not grouped yet**, until someone presses **Sync all callings**.
 
 Open it with `?sheet=<link or id>` to pick the sheet, e.g.
 `https://lcrcallings.click/app/?sheet=https://docs.google.com/spreadsheets/d/…`,
-or paste the sheet's link the first time it opens. It's remembered after that.
+or choose it in Google's file picker the first time it opens. It's remembered
+after that. Opened on a sheet its user hasn't chosen for the app yet, it shows
+the picker on just that sheet (see [Sheet access](#sheet-access)).
 **Copy link**, on the page or in the extension's panel, copies a link like
 that for the sheet that's open. If the browser won't copy it, the link shows
 in a box to copy by hand.
@@ -114,19 +136,23 @@ To set it up:
    with no path, and `http://127.0.0.1:8002` for `npm run web`) under
    **Authorized JavaScript origins**. Everyone using it still needs to be a
    test user on the consent screen.
-2. On GitHub, add its client id as a repository variable `WEB_OAUTH_CLIENT_ID`
-   (Settings → Secrets and variables → Actions → **Variables**), and
-   optionally `SPREADSHEET_ID` so the page opens that sheet without being
-   told. Neither is secret: they end up in the page.
-3. Under Settings → Pages, set **Source** to **GitHub Actions** and
+2. In the same project, under **APIs & Services → Credentials**, create an
+   **API key** for the picker and restrict it to the **Google Picker API**.
+3. On GitHub, add the client id as a repository variable `WEB_OAUTH_CLIENT_ID`
+   (Settings → Secrets and variables → Actions → **Variables**), the API key
+   as `PICKER_API_KEY`, and optionally `SPREADSHEET_ID` so the page opens
+   that sheet without being told. None are secret: they end up in the page.
+   For `npm run web`, put them in `.env`.
+4. Under Settings → Pages, set **Source** to **GitHub Actions** and
    **Custom domain** to `lcrcallings.click` (see [Website](#website)).
-4. Push to `main`. `.github/workflows/deploy.yml` runs the checks, then
+5. Push to `main`. `.github/workflows/deploy.yml` runs the checks, then
    `npm run pages:build` builds the [website](#website) into `public/`, the
    page into `public/app/` and the [demo](#demo) into `public/demo/`, and
    publishes them to GitHub Pages at https://lcrcallings.click/,
    https://lcrcallings.click/app/ and https://lcrcallings.click/demo/.
-5. Add the page's address to `.env` as `WEB_URL=https://lcrcallings.click/app/`
-   and rebuild the extension, so its panel can share links to the page.
+6. Add the page's address to `.env` as `WEB_URL=https://lcrcallings.click/app/`
+   and rebuild the extension, so its panel can share links to the page and
+   open it to choose a sheet.
 
 Links from before the page moved to `/app/` (`/?sheet=…`) are sent on to it.
 
@@ -252,7 +278,7 @@ and `Members.csv`. To set up a sheet from them:
    is the name the page looks for.
 3. Do the same for `Members.csv`, then delete the empty `Sheet1` if you like.
 4. Share the sheet with whoever will try it, and open the web page with
-   `?sheet=<the sheet's link>`.
+   `?sheet=<the sheet's link>`. Each of them chooses it in the picker once.
 
 `npm run demo:sheet` rewrites the files from `demo/data.ts`; a test fails if
 they're out of date.
@@ -286,7 +312,8 @@ they're out of date.
   pulling it out of the page's HTML (`flightFromHtml`) if that's what comes
   back. It needs the LCR session cookie, so it runs in the content script.
 - `web/` is the web page. `google.ts` gets tokens from Google Identity
-  Services for the same Sheets client the extension uses; the page reuses
+  Services for the same Sheets client the extension uses, and `picker.ts`
+  shows Google's file picker to give the app access to a sheet; the page reuses
   the extension's candidate field (`src/CandidatesField.tsx`) and editing
   and saving (`src/useConsiderations.ts`).
 - `scripts/manifest.ts` generates `manifest.json` from `package.json` and

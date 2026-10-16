@@ -1,3 +1,4 @@
+import { SheetsError } from '../background/sheets'
 import { fetchMemberList } from '../lcr/memberList'
 import type { Member } from '../lcr/members'
 import type { Consideration, Tracking } from '../shared/consideration'
@@ -20,7 +21,7 @@ export interface ExtensionApi {
 
 async function send<T extends BackgroundRequest>(request: T): Promise<BackgroundResponses[T['type']]> {
   const result = await chrome.runtime.sendMessage<T, Result<BackgroundResponses[T['type']]>>(request)
-  if (!result.ok) throw new Error(result.error)
+  if (!result.ok) throw result.status === undefined ? new Error(result.error) : new SheetsError(result.status, result.error)
   return result.data
 }
 

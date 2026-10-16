@@ -1,10 +1,11 @@
 import { ActionIcon, Alert, Button, Group, Loader, Paper, Stack, Text, TextInput, Title } from '@mantine/core'
 import { type ReactNode, useCallback, useEffect, useState } from 'react'
+import { needsAccess } from './background/sheets'
 import { APP_NAME } from './constants'
 import type { ExtensionApi } from './content/api'
 import { COLUMN_TITLE } from './page/enhance'
 import type { Tracking } from './shared/consideration'
-import { parseSpreadsheetId } from './shared/spreadsheet'
+import { parseSpreadsheetId, webPageLink } from './shared/spreadsheet'
 import { Tracker } from './Tracker'
 
 export interface AppProps {
@@ -22,6 +23,8 @@ type State
     | { step: 'connecting', spreadsheetId: string }
     | { step: 'ready', spreadsheetId: string, values: Record<string, Tracking> }
     | { step: 'failed', spreadsheetId: string, error: string }
+    /** `opened` once the web page is open to choose the sheet in */
+    | { step: 'needsAccess', spreadsheetId: string, opened: boolean }
 
 const message = (error: unknown) => error instanceof Error ? error.message : String(error)
 
@@ -36,9 +39,22 @@ export function App({ doc, api, onClose, webUrl }: AppProps) {
       setState({ step: 'ready', spreadsheetId, values })
     }
     catch (error) {
-      setState({ step: 'failed', spreadsheetId, error: message(error) })
+      setState(needsAccess(error) ? { step: 'needsAccess', spreadsheetId, opened: false } : { step: 'failed', spreadsheetId, error: message(error) })
     }
   }, [api])
+
+  // Once they've chosen the sheet on the web page and come back to this tab, try again
+  const waitingFor = state.step === 'needsAccess' && state.opened ? state.spreadsheetId : undefined
+  useEffect(() => {
+    if (!waitingFor) return
+    const onVisible = () => {
+      if (doc.visibilityState === 'visible') void connect(waitingFor)
+    }
+    doc.addEventListener('visibilitychange', onVisible)
+    return () => {
+      doc.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [doc, waitingFor, connect])
 
   useEffect(() => {
     void api.getSpreadsheetId().then(async (id) => {
@@ -76,6 +92,33 @@ export function App({ doc, api, onClose, webUrl }: AppProps) {
         </>
       )
       break
+    case 'needsAccess': {
+      const { spreadsheetId } = state
+      body = (
+        <>
+          <Text size="sm">
+            {`Google lets ${APP_NAME} open only the sheets you choose for it, which you do once on the ${APP_NAME} web page. Sign in there with the same Google account as Chrome.`}
+          </Text>
+          {!webUrl && <Alert color="red" p="xs">This copy of the extension doesn't know where the web page is, so it can't open it.</Alert>}
+          <Group>
+            {webUrl && (
+              <Button
+                size="xs"
+                onClick={() => {
+                  doc.defaultView?.open(webPageLink(webUrl, spreadsheetId), '_blank', 'noopener')
+                  setState({ step: 'needsAccess', spreadsheetId, opened: true })
+                }}
+              >
+                Choose the sheet
+              </Button>
+            )}
+            <Button size="xs" variant="default" onClick={() => void connect(spreadsheetId)}>Try again</Button>
+            <Button size="xs" variant="default" onClick={changeSheet}>Change sheet</Button>
+          </Group>
+        </>
+      )
+      break
+    }
     case 'ready':
       body = <Tracker doc={doc} api={api} spreadsheetId={state.spreadsheetId} initial={state.values} webUrl={webUrl} onChangeSheet={changeSheet} />
       break

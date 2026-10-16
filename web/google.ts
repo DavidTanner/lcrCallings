@@ -2,7 +2,8 @@ import type { TokenProvider } from '../src/background/sheets'
 
 /** Google Identity Services, which gives the page tokens for the Sheets API */
 const GIS_URL = 'https://accounts.google.com/gsi/client'
-const SCOPE = 'https://www.googleapis.com/auth/spreadsheets'
+/** Only the sheets this person chose for the app in Google's file picker */
+const SCOPE = 'https://www.googleapis.com/auth/drive.file'
 /** Tokens are treated as expired this long before Google says, so a save doesn't race the expiry */
 const EXPIRY_MARGIN_MS = 60_000
 

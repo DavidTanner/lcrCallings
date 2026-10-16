@@ -17,7 +17,8 @@ export interface BackgroundResponses {
   saveMembers: null
 }
 
-export type Result<T> = { ok: true, data: T } | { ok: false, error: string }
+/** `status` is Google's, when the Sheets API refused the request */
+export type Result<T> = { ok: true, data: T } | { ok: false, error: string, status?: number }
 
 /** Message the background sends a tab when the toolbar button is clicked */
 export interface ToggleMessage { type: 'toggle' }

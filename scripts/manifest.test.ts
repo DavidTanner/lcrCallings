@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { generateKeyPairSync } from 'node:crypto'
 import { describe, it } from 'node:test'
-import { buildManifest, extensionId, LCR_MATCH } from './manifest'
+import { buildManifest, DRIVE_FILE_SCOPE, extensionId, LCR_MATCH } from './manifest'
 
 describe('buildManifest', () => {
   it('runs on LCR and can reach Google Sheets', () => {
@@ -11,7 +11,8 @@ describe('buildManifest', () => {
     assert.equal(manifest.key, 'KEY')
     assert.deepEqual(manifest.content_scripts?.[0]?.matches, [LCR_MATCH])
     assert.deepEqual(manifest.host_permissions, [LCR_MATCH, 'https://sheets.googleapis.com/*'])
-    assert.deepEqual(manifest.oauth2, { client_id: 'client.apps.googleusercontent.com', scopes: ['https://www.googleapis.com/auth/spreadsheets'] })
+    assert.deepEqual(manifest.oauth2, { client_id: 'client.apps.googleusercontent.com', scopes: [DRIVE_FILE_SCOPE] })
+    assert.equal(DRIVE_FILE_SCOPE, 'https://www.googleapis.com/auth/drive.file')
   })
 
   it('also runs on the demo page in dev', () => {

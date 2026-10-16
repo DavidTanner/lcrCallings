@@ -7,10 +7,12 @@ import { parseSpreadsheetId } from '../src/shared/spreadsheet'
 import { WebApp } from './App'
 import type { WebApi } from './Board'
 import { createGoogleAuth, type GoogleAuth, loadGis } from './google'
+import { loadPicker, pickSpreadsheet, projectNumber } from './picker'
 
 // set when building, from the environment (see scripts/web.ts)
 const CLIENT_ID = process.env.WEB_OAUTH_CLIENT_ID ?? ''
 const DEFAULT_SPREADSHEET_ID = process.env.SPREADSHEET_ID ?? ''
+const PICKER_API_KEY = process.env.PICKER_API_KEY || undefined
 
 const SPREADSHEET_ID_KEY = 'callings-spreadsheet-id'
 
@@ -73,7 +75,16 @@ function Root() {
   if (!CLIENT_ID) return <Alert color="red" m="md" title="Not set up">This page was built without WEB_OAUTH_CLIENT_ID. See the README.</Alert>
   if (error) return <Alert color="red" m="md">{error}</Alert>
   if (!google) return <Center h="100vh"><Loader /></Center>
-  return <WebApp auth={google.auth} api={google.api} spreadsheetId={spreadsheetId} onSpreadsheetId={saveSpreadsheetId} pageUrl={location.href} />
+  const { auth } = google
+  // the picker's script loads the first time it's needed, not on every visit
+  const pickSheet = async (id?: string) => pickSpreadsheet(await loadPicker(), {
+    token: await auth.tokens.get(),
+    appId: projectNumber(CLIENT_ID),
+    apiKey: PICKER_API_KEY,
+    origin: location.origin,
+    spreadsheetId: id,
+  })
+  return <WebApp auth={auth} api={google.api} spreadsheetId={spreadsheetId} onSpreadsheetId={saveSpreadsheetId} pageUrl={location.href} pickSheet={pickSheet} />
 }
 
 const style = document.createElement('style')

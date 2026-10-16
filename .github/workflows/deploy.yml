@@ -35,6 +35,7 @@ jobs:
       - run: npm run pages:build
         env:
           WEB_OAUTH_CLIENT_ID: ${{ vars.WEB_OAUTH_CLIENT_ID }}
+          PICKER_API_KEY: ${{ vars.PICKER_API_KEY }}
           SPREADSHEET_ID: ${{ vars.SPREADSHEET_ID }}
           CWS_EXTENSION_ID: ${{ vars.CWS_EXTENSION_ID }}
       - uses: actions/configure-pages@v6
