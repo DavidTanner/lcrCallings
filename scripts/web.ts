@@ -9,11 +9,12 @@ import { copyFile, mkdir, rm } from 'node:fs/promises'
 const serve = process.argv.includes('--serve')
 const outdir = 'public/app'
 
-// WEB_OAUTH_CLIENT_ID (and optionally SPREADSHEET_ID) can live in .env
-// (git-ignored), or come from CI variables
+// WEB_OAUTH_CLIENT_ID, PICKER_API_KEY (and optionally SPREADSHEET_ID) can
+// live in .env (git-ignored), or come from CI variables
 if (existsSync('.env')) process.loadEnvFile('.env')
-const { WEB_OAUTH_CLIENT_ID: clientId = '', SPREADSHEET_ID: spreadsheetId = '' } = process.env
+const { WEB_OAUTH_CLIENT_ID: clientId = '', PICKER_API_KEY: pickerApiKey = '', SPREADSHEET_ID: spreadsheetId = '' } = process.env
 if (!clientId) console.warn('WEB_OAUTH_CLIENT_ID is not set, so Google sign-in won\'t work. See README.md.')
+if (!pickerApiKey) console.warn('PICKER_API_KEY is not set, so Google\'s file picker may not open. See README.md.')
 
 const options: esbuild.BuildOptions = {
   entryPoints: ['web/main.tsx'],
@@ -33,6 +34,7 @@ const options: esbuild.BuildOptions = {
     'process.env.NODE_ENV': JSON.stringify(serve ? 'development' : 'production'),
     'process.env.WEB_OAUTH_CLIENT_ID': JSON.stringify(clientId),
     'process.env.SPREADSHEET_ID': JSON.stringify(spreadsheetId),
+    'process.env.PICKER_API_KEY': JSON.stringify(pickerApiKey),
   },
 }
 

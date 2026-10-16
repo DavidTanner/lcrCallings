@@ -1,5 +1,5 @@
 import type { BackgroundRequest, BackgroundResponses, Result, ToggleMessage } from '../shared/messages'
-import { createSheetsClient } from './sheets'
+import { createSheetsClient, SheetsError } from './sheets'
 
 const sheets = createSheetsClient({
   async get() {
@@ -31,7 +31,11 @@ chrome.runtime.onMessage.addListener((request: BackgroundRequest, _sender, sendR
       sendResponse({ ok: true, data })
     },
     (error: unknown) => {
-      sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) })
+      sendResponse({
+        ok: false,
+        error: error instanceof Error ? error.message : String(error),
+        ...(error instanceof SheetsError ? { status: error.status } : {}),
+      })
     },
   )
   return true // respond asynchronously

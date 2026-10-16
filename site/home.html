@@ -24,13 +24,13 @@
 <ol>
   <li>Create a Google Sheet and share it with the leaders who should see it.</li>
   <li>Open the Organizations page in LCR and click the {{appName}} toolbar button, or open the <a href="/app/">web app</a>.</li>
-  <li>Paste the link to the sheet and sign in with Google.</li>
+  <li>Sign in with Google and choose the sheet in Google's file picker. Everyone who uses the sheet chooses it once.</li>
   <li>Pick candidates, statuses and notes for each calling. They save to the sheet right away, and others see them when they refresh.</li>
 </ol>
 <p>The <a href="/demo/">demo</a> shows the extension on a mock Organizations page with made-up members, without signing in to anything.</p>
 
 <h2>Google sign-in and your data</h2>
-<p>{{appName}} asks you to sign in with Google only so it can read and write the one Google Sheet you choose, through the Google Sheets API (the <code>https://www.googleapis.com/auth/spreadsheets</code> permission). It doesn't ask for your name, email address or any other Google data.</p>
+<p>{{appName}} asks you to sign in with Google only so it can read and write the one Google Sheet you choose for it in Google's file picker (the <code>https://www.googleapis.com/auth/drive.file</code> permission, which gives it no access to any other file in your Google Drive). It doesn't ask for your name, email address or any other Google data.</p>
 <p>{{appName}} has no server, database, analytics or ads. Data goes directly between your browser, your Google Sheet and LCR, using your own accounts, and is never sent to the developer or anyone else. See the <a href="/privacy/">Privacy Policy</a> for exactly what is accessed and how, and the <a href="/terms/">Terms of Service</a>.</p>
 
 <div class="note">

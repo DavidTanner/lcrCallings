@@ -2,7 +2,7 @@ import { MantineProvider } from '@mantine/core'
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import assert from 'node:assert/strict'
 import { afterEach, describe, it } from 'node:test'
-import type { SheetMember } from '../src/background/sheets'
+import { type SheetMember, SheetsError } from '../src/background/sheets'
 import { fakeClipboard } from '../test/clipboard'
 import type { Consideration } from '../src/shared/consideration'
 import { WebApp } from './App'
@@ -45,12 +45,17 @@ function fakeAuth(signedIn: boolean) {
   return auth
 }
 
-/** A pretend sheet that needs `auth` to be signed in */
+/** A pretend sheet that needs `auth` to be signed in, and the app to have been given access to it unless `blocked` */
 function fakeApi(auth: GoogleAuth, rows = ROWS, members = MEMBERS) {
   const saved: Consideration[] = []
-  const signedIn = () => auth.isSignedIn() ? Promise.resolve() : Promise.reject(new SignInRequired())
-  const api: WebApi & { saved: Consideration[] } = {
+  const signedIn = () => {
+    if (!auth.isSignedIn()) return Promise.reject(new SignInRequired())
+    if (api.blocked) return Promise.reject(new SheetsError(404, 'Requested entity was not found.'))
+    return Promise.resolve()
+  }
+  const api: WebApi & { saved: Consideration[], blocked: boolean } = {
     saved,
+    blocked: false,
     loadRows: async () => {
       await signedIn()
       return structuredClone(rows)
@@ -67,14 +72,27 @@ function fakeApi(auth: GoogleAuth, rows = ROWS, members = MEMBERS) {
   return api
 }
 
+/** Google's file picker, where the sheet chosen is `SHEET_ID`, or nothing if `cancel`; choosing one gives the app access to it */
+function fakePicker(api: ReturnType<typeof fakeApi>, cancel = false) {
+  const opened: (string | undefined)[] = []
+  const pickSheet = (id?: string) => {
+    opened.push(id)
+    if (cancel) return Promise.resolve(undefined)
+    api.blocked = false
+    return Promise.resolve(SHEET_ID)
+  }
+  return { opened, pickSheet }
+}
+
 interface RenderOptions {
   spreadsheetId?: string
   onSpreadsheetId?: (id: string | undefined) => void
+  pickSheet?: (id?: string) => Promise<string | undefined>
 }
 
-const renderApp = (auth: GoogleAuth, api: WebApi, { spreadsheetId, onSpreadsheetId = () => undefined }: RenderOptions = { spreadsheetId: SHEET_ID }) => render(
+const renderApp = (auth: GoogleAuth, api: WebApi, { spreadsheetId, onSpreadsheetId = () => undefined, pickSheet = () => Promise.resolve(undefined) }: RenderOptions = { spreadsheetId: SHEET_ID }) => render(
   <MantineProvider env="test">
-    <WebApp auth={auth} api={api} spreadsheetId={spreadsheetId} onSpreadsheetId={onSpreadsheetId} pageUrl={PAGE_URL} />
+    <WebApp auth={auth} api={api} spreadsheetId={spreadsheetId} onSpreadsheetId={onSpreadsheetId} pageUrl={PAGE_URL} pickSheet={pickSheet} />
   </MantineProvider>,
 )
 
@@ -88,17 +106,47 @@ const click = async (element: HTMLElement) => {
 describe('WebApp', () => {
   afterEach(cleanup)
 
-  it('asks for the sheet when it has none', async () => {
-    const auth = fakeAuth(true)
+  it('signs in and has them choose the sheet in Google\'s picker when it has none', async () => {
+    const auth = fakeAuth(false)
+    const api = fakeApi(auth)
+    const picker = fakePicker(api)
     const chosen: (string | undefined)[] = []
-    renderApp(auth, fakeApi(auth), {
+    renderApp(auth, api, {
       onSpreadsheetId: (id) => {
         chosen.push(id)
       },
+      pickSheet: picker.pickSheet,
     })
-    fireEvent.change(screen.getByLabelText(/Google Sheet/), { target: { value: `https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit` } })
-    await click(screen.getByRole('button', { name: 'Open' }))
+    await click(screen.getByRole('button', { name: 'Choose a Google Sheet' }))
+    assert.equal(auth.signIns, 1)
+    assert.deepEqual(picker.opened, [undefined])
     assert.deepEqual(chosen, [SHEET_ID])
+    assert.ok(await screen.findByText('Ward Clerk'))
+  })
+
+  it('stays put when the picker is cancelled', async () => {
+    const auth = fakeAuth(true)
+    const api = fakeApi(auth)
+    const chosen: (string | undefined)[] = []
+    renderApp(auth, api, {
+      onSpreadsheetId: (id) => {
+        chosen.push(id)
+      },
+      pickSheet: fakePicker(api, true).pickSheet,
+    })
+    await click(screen.getByRole('button', { name: 'Choose a Google Sheet' }))
+    assert.deepEqual(chosen, [])
+    assert.ok(screen.getByRole('button', { name: 'Choose a Google Sheet' }))
+  })
+
+  it('has them choose a linked sheet the app hasn\'t been given access to yet, then opens it', async () => {
+    const auth = fakeAuth(true)
+    const api = fakeApi(auth)
+    api.blocked = true
+    const picker = fakePicker(api)
+    renderApp(auth, api, { spreadsheetId: SHEET_ID, pickSheet: picker.pickSheet })
+    await click(await screen.findByRole('button', { name: 'Choose the sheet' }))
+    assert.deepEqual(picker.opened, [SHEET_ID])
     assert.ok(await screen.findByText('Ward Clerk'))
   })
 

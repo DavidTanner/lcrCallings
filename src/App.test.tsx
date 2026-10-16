@@ -327,6 +327,32 @@ describe('App', () => {
     assert.ok(await screen.findByText(/Tracking 2 callings/))
   })
 
+  it('opens the web page to choose a sheet the app hasn\'t been given access to, and connects on coming back', async () => {
+    const api = fakeApi({ spreadsheetId: SHEET_ID })
+    api.blocked = true
+    const opened = mock.method(window, 'open', () => null)
+    renderApp(api, undefined, 'https://lcrcallings.click/app/')
+    await screen.findByText(/only the sheets you choose/)
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Choose the sheet' }))
+      await Promise.resolve()
+    })
+    assert.equal(opened.mock.calls[0]?.arguments[0], `https://lcrcallings.click/app/?sheet=${SHEET_ID}`)
+    opened.mock.restore()
+
+    delete api.blocked
+    document.dispatchEvent(new window.Event('visibilitychange'))
+    assert.ok(await screen.findByText(/Tracking 2 callings/))
+  })
+
+  it('can\'t open the web page to give access when built without its address', async () => {
+    const api = fakeApi({ spreadsheetId: SHEET_ID })
+    api.blocked = true
+    renderApp(api)
+    assert.ok(await screen.findByText(/doesn't know where the web page is/))
+    assert.equal(screen.queryByRole('button', { name: 'Choose the sheet' }), null)
+  })
+
   it('removes the column when closed', async () => {
     const onClose = mock.fn()
     const { unmount } = renderApp(fakeApi({ spreadsheetId: SHEET_ID }), onClose)

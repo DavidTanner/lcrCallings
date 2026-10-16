@@ -1,3 +1,4 @@
+import { SheetsError } from '../src/background/sheets'
 import type { ExtensionApi } from '../src/content/api'
 import type { Member } from '../src/lcr/members'
 import { type Consideration, type Tracking, tracking } from '../src/shared/consideration'
@@ -18,7 +19,7 @@ export interface FakeApiOptions {
 export function fakeApi({ spreadsheetId, sheet = {}, members = MEMBERS }: FakeApiOptions = {}) {
   const saved: Consideration[] = []
   const synced: Consideration[] = []
-  const api: ExtensionApi & { saved: Consideration[], synced: Consideration[], sheet: Record<string, Tracking>, failWith?: string, membersFailWith?: string, savedMembers?: Member[] } = {
+  const api: ExtensionApi & { saved: Consideration[], synced: Consideration[], sheet: Record<string, Tracking>, failWith?: string, blocked?: boolean, membersFailWith?: string, savedMembers?: Member[] } = {
     saved,
     synced,
     sheet,
@@ -27,7 +28,12 @@ export function fakeApi({ spreadsheetId, sheet = {}, members = MEMBERS }: FakeAp
       spreadsheetId = id
       return Promise.resolve()
     },
-    load: () => api.failWith ? Promise.reject(new Error(api.failWith)) : Promise.resolve({ ...api.sheet }),
+    load: () => {
+      if (api.failWith) return Promise.reject(new Error(api.failWith))
+      // as Google answers for a sheet the app hasn't been given access to
+      if (api.blocked) return Promise.reject(new SheetsError(404, 'Requested entity was not found.'))
+      return Promise.resolve({ ...api.sheet })
+    },
     save: (_id, consideration) => {
       if (api.failWith) return Promise.reject(new Error(api.failWith))
       saved.push(consideration)

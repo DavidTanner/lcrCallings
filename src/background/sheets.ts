@@ -47,6 +47,13 @@ export class SheetsError extends Error {
 }
 
 /**
+ * The app only has access (the drive.file scope) to sheets someone chose for
+ * it in Google's file picker, so Google answers 403 or 404 for any other,
+ * just as it does for one that isn't shared with them
+ */
+export const needsAccess = (error: unknown) => error instanceof SheetsError && (error.status === 403 || error.status === 404)
+
+/**
  * Reads and writes considerations in a shared spreadsheet, one row per
  * calling row on the page, keyed by column A.
  */
