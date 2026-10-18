@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { APP_NAME } from '../src/constants.ts'
+import { PICKER_FRAME } from '../src/shared/picker.ts'
 
 export const LCR_MATCH = 'https://lcr.churchofjesuschrist.org/*'
 export const DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file'
@@ -30,8 +31,10 @@ export function buildManifest({ version, description, clientId, key, dev }: Mani
     // content script to LCR tabs that were open before install
     permissions: ['identity', 'storage', 'scripting'],
     host_permissions: [...matches, 'https://sheets.googleapis.com/*'],
+    // the frame the content script shows Google's file picker in, over LCR
+    web_accessible_resources: [{ resources: [PICKER_FRAME], matches }],
     // drive.file: only the sheets each person has chosen for the app, in
-    // Google's file picker on the web page
+    // Google's file picker
     ...(clientId ? { oauth2: { client_id: clientId, scopes: [DRIVE_FILE_SCOPE] } } : {}),
   }
 }

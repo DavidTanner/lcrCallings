@@ -16,10 +16,11 @@ https://lcrcallings.click/disclaimer/.
 ## Using it
 
 1. Open the Organizations page in LCR and click the extension's toolbar button.
-2. The first time, paste the link to a Google Sheet shared with everyone who
-   should see the column, and approve Google sign-in. The extension can only
-   open sheets you've chosen for it (see [Sheet access](#sheet-access)), so
-   the first time it opens the [web page](#web-page) to choose it there.
+2. The first time, choose a Google Sheet shared with everyone who should see
+   the column in Google's file picker, which opens over LCR, and approve
+   Google sign-in. The extension can only open sheets you've chosen for it
+   (see [Sheet access](#sheet-access)), so if you paste a sheet's link
+   instead, or someone else set up the sheet, it asks you to choose it once.
 3. In the **Considering** column, pick members for each calling, then set
    each one's status (Submitted by Presidency, Discussion, … Sustained,
    Released, …) and add notes in the fields that appear under them. Picks and
@@ -71,13 +72,24 @@ so everyone who uses a sheet chooses it once. Until they do, the Sheets API
 answers 403 or 404, as it does for a sheet that isn't shared with them, and
 both the web page and the extension ask them to choose it.
 
-Chrome extensions can't load the picker's script, so the extension opens the
-[web page](#web-page) on the sheet (`?sheet=…`), which shows the picker on
-just that sheet (`setFileIds`). Access is granted to the Google Cloud project
-(the picker's `setAppId`, the project number, which the page takes from the
-start of its OAuth client id), so the extension's own tokens can open the
-sheet too, as long as both sign in to the same Google account. The panel
-connects again when its tab is shown again.
+Chrome extensions can't load the picker's script, and LCR's
+Content-Security-Policy won't let it frame other sites, but it can't stop a
+frame of the extension's own page. So the panel covers LCR with a frame of the
+extension's `picker.html`, which frames the [web page](#web-page)'s
+`pick.html`, which shows the picker, on just the sheet if there is one
+(`setFileIds`):
+
+    LCR (content script) ⟶ picker.html (extension) ⟶ pick.html (web page) ⟶ Google's picker
+
+`picker.html` hands `pick.html` the extension's own token, so there's no
+second sign-in, and passes the sheet chosen back to the panel
+(`src/shared/picker.ts`). The picker has to be told the origin of the page
+at the top (`setOrigin`), LCR's, not that of the frame it's in. Access is granted to the Google Cloud project (the
+picker's `setAppId`, the project number, which the page takes from the start
+of its OAuth client id), so the extension's tokens can open the sheet. If the
+picker can't be shown there, the panel offers to open the web page on the
+sheet (`?sheet=…`) instead, and connects again when its tab is shown again;
+sign in there with the same Google account as Chrome.
 
 ## Setup
 
@@ -152,7 +164,8 @@ To set it up:
    https://lcrcallings.click/app/ and https://lcrcallings.click/demo/.
 6. Add the page's address to `.env` as `WEB_URL=https://lcrcallings.click/app/`
    and rebuild the extension, so its panel can share links to the page and
-   open it to choose a sheet.
+   show Google's file picker, which comes from the page's `pick.html`.
+   Deploy the page before releasing an extension that needs a new `pick.html`.
 
 Links from before the page moved to `/app/` (`/?sheet=…`) are sent on to it.
 
@@ -291,7 +304,9 @@ they're out of date.
   LCR's Content Security Policy, which blocks connections to Google.
 - `src/content/` is the content script. It mounts the panel and asks the
   background to load and save through `api.ts`, which is the only part that
-  touches Chrome APIs; tests use a fake instead.
+  touches Chrome APIs; tests use a fake instead. `picker.ts` covers the page
+  with the extension's `picker.html` (`src/picker/`) to show Google's file
+  picker (see [Sheet access](#sheet-access)).
 - `src/App.tsx` is the panel: pick a sheet, connect, then show sync status.
 - `src/Tracker.tsx` renders a `MultiSelect` and notes into each row's cell
   through React portals, and saves changes. Each cell is its own shadow root
@@ -313,7 +328,8 @@ they're out of date.
   back. It needs the LCR session cookie, so it runs in the content script.
 - `web/` is the web page. `google.ts` gets tokens from Google Identity
   Services for the same Sheets client the extension uses, and `picker.ts`
-  shows Google's file picker to give the app access to a sheet; the page reuses
+  shows Google's file picker to give the app access to a sheet, for the page
+  and, through `pick.html` (`pick.ts`), for the extension; the page reuses
   the extension's candidate field (`src/CandidatesField.tsx`) and editing
   and saving (`src/useConsiderations.ts`).
 - `scripts/manifest.ts` generates `manifest.json` from `package.json` and

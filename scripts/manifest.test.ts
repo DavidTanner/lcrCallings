@@ -11,6 +11,7 @@ describe('buildManifest', () => {
     assert.equal(manifest.key, 'KEY')
     assert.deepEqual(manifest.content_scripts?.[0]?.matches, [LCR_MATCH])
     assert.deepEqual(manifest.host_permissions, [LCR_MATCH, 'https://sheets.googleapis.com/*'])
+    assert.deepEqual(manifest.web_accessible_resources, [{ resources: ['picker.html'], matches: [LCR_MATCH] }])
     assert.deepEqual(manifest.oauth2, { client_id: 'client.apps.googleusercontent.com', scopes: [DRIVE_FILE_SCOPE] })
     assert.equal(DRIVE_FILE_SCOPE, 'https://www.googleapis.com/auth/drive.file')
   })

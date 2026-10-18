@@ -1,6 +1,6 @@
 import * as esbuild from 'esbuild'
 import { existsSync } from 'node:fs'
-import { mkdir, rm, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, rm, writeFile } from 'node:fs/promises'
 import { buildManifest } from './manifest.ts'
 import pkg from '../package.json'
 
@@ -43,6 +43,13 @@ const builds: esbuild.BuildOptions[] = [
     outfile: `${outdir}/background.js`,
     format: 'esm',
   },
+  {
+    // the frame Google's file picker is shown in over LCR (src/shared/picker.ts)
+    ...common,
+    entryPoints: ['src/picker/index.ts'],
+    outfile: `${outdir}/picker.js`,
+    format: 'iife',
+  },
 ]
 
 await rm(outdir, { recursive: true, force: true })
@@ -54,6 +61,7 @@ const manifest = buildManifest({
   ...(dev ? { key, dev } : {}),
 })
 await writeFile(`${outdir}/manifest.json`, JSON.stringify(manifest, null, 2))
+await copyFile('src/picker/picker.html', `${outdir}/picker.html`)
 
 await Promise.all(builds.map(options => esbuild.build(options)))
 console.log(`Built ${outdir}/. Load it as an unpacked extension, or zip it for the Chrome Web Store.`)

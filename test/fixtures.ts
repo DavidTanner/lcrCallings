@@ -19,10 +19,26 @@ export interface FakeApiOptions {
 export function fakeApi({ spreadsheetId, sheet = {}, members = MEMBERS }: FakeApiOptions = {}) {
   const saved: Consideration[] = []
   const synced: Consideration[] = []
-  const api: ExtensionApi & { saved: Consideration[], synced: Consideration[], sheet: Record<string, Tracking>, failWith?: string, blocked?: boolean, membersFailWith?: string, savedMembers?: Member[] } = {
+  const picks: (string | undefined)[] = []
+  const api: ExtensionApi & {
+    saved: Consideration[]
+    synced: Consideration[]
+    sheet: Record<string, Tracking>
+    failWith?: string
+    blocked?: boolean
+    membersFailWith?: string
+    savedMembers?: Member[]
+    /** the sheet each time Google's picker was shown on one, or undefined for any */
+    picks: (string | undefined)[]
+    /** chosen in the picker when it isn't shown on just one sheet */
+    pickResult?: string
+    cancelPick?: boolean
+    pickFailWith?: string
+  } = {
     saved,
     synced,
     sheet,
+    picks,
     getSpreadsheetId: () => Promise.resolve(spreadsheetId),
     setSpreadsheetId: (id) => {
       spreadsheetId = id
@@ -54,6 +70,14 @@ export function fakeApi({ spreadsheetId, sheet = {}, members = MEMBERS }: FakeAp
       if (api.failWith) return Promise.reject(new Error(api.failWith))
       api.savedMembers = saved
       return Promise.resolve()
+    },
+    pickSheet: (id) => {
+      picks.push(id)
+      if (api.pickFailWith) return Promise.reject(new Error(api.pickFailWith))
+      if (api.cancelPick) return Promise.resolve(undefined)
+      // choosing it gives the app access
+      delete api.blocked
+      return Promise.resolve(id ?? api.pickResult)
     },
   }
   return api

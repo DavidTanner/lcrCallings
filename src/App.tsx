@@ -23,8 +23,8 @@ type State
     | { step: 'connecting', spreadsheetId: string }
     | { step: 'ready', spreadsheetId: string, values: Record<string, Tracking> }
     | { step: 'failed', spreadsheetId: string, error: string }
-    /** `opened` once the web page is open to choose the sheet in */
-    | { step: 'needsAccess', spreadsheetId: string, opened: boolean }
+    /** `opened` once the web page is open to choose the sheet in; `error` if Google's picker failed */
+    | { step: 'needsAccess', spreadsheetId: string, opened: boolean, error?: string }
 
 const message = (error: unknown) => error instanceof Error ? error.message : String(error)
 
@@ -67,6 +67,16 @@ export function App({ doc, api, onClose, webUrl }: AppProps) {
     setState({ step: 'setup' })
   }
 
+  // Google's picker is shown by the web page, so needs its address
+  const pickSheet = webUrl ? api.pickSheet : undefined
+
+  /** Shows Google's file picker over the page, then connects to the sheet chosen */
+  const choose = async (spreadsheetId?: string) => {
+    if (!pickSheet) return
+    const picked = await pickSheet(spreadsheetId)
+    if (picked) await connect(picked)
+  }
+
   let body: ReactNode
   switch (state.step) {
     case 'starting':
@@ -79,7 +89,7 @@ export function App({ doc, api, onClose, webUrl }: AppProps) {
       )
       break
     case 'setup':
-      body = <Setup onConnect={id => void connect(id)} />
+      body = <Setup onConnect={id => void connect(id)} onChoose={pickSheet && (() => choose())} />
       break
     case 'failed':
       body = (
@@ -93,20 +103,45 @@ export function App({ doc, api, onClose, webUrl }: AppProps) {
       )
       break
     case 'needsAccess': {
-      const { spreadsheetId } = state
+      const { spreadsheetId, error } = state
+      /** The way before the picker could be shown here, in case it can't be */
+      const openWebPage = webUrl
+        ? () => {
+            doc.defaultView?.open(webPageLink(webUrl, spreadsheetId), '_blank', 'noopener')
+            setState({ step: 'needsAccess', spreadsheetId, opened: true })
+          }
+        : undefined
       body = (
         <>
           <Text size="sm">
-            {`Google lets ${APP_NAME} open only the sheets you choose for it, which you do once on the ${APP_NAME} web page. Sign in there with the same Google account as Chrome.`}
+            {`Google lets ${APP_NAME} open only the sheets you choose for it. Choose this one once to open it.`}
           </Text>
-          {!webUrl && <Alert color="red" p="xs">This copy of the extension doesn't know where the web page is, so it can't open it.</Alert>}
+          {!webUrl && <Alert color="red" p="xs">{`This copy of the extension doesn't know where the ${APP_NAME} web page is, so it can't show Google's file picker.`}</Alert>}
+          {error && (
+            <Alert color="red" p="xs">
+              <Stack gap="xs" align="flex-start">
+                <Text size="sm">{error}</Text>
+                {openWebPage && (
+                  <>
+                    <Text size="sm">{`You can choose it on the ${APP_NAME} web page instead. Sign in there with the same Google account as Chrome.`}</Text>
+                    <Button size="xs" variant="default" onClick={openWebPage}>Open the web page</Button>
+                  </>
+                )}
+              </Stack>
+            </Alert>
+          )}
           <Group>
-            {webUrl && (
+            {(pickSheet ?? openWebPage) && (
               <Button
                 size="xs"
                 onClick={() => {
-                  doc.defaultView?.open(webPageLink(webUrl, spreadsheetId), '_blank', 'noopener')
-                  setState({ step: 'needsAccess', spreadsheetId, opened: true })
+                  if (!pickSheet) {
+                    openWebPage?.()
+                    return
+                  }
+                  choose(spreadsheetId).catch((e: unknown) => {
+                    setState({ step: 'needsAccess', spreadsheetId, opened: false, error: message(e) })
+                  })
                 }}
               >
                 Choose the sheet
@@ -139,33 +174,53 @@ export function App({ doc, api, onClose, webUrl }: AppProps) {
   )
 }
 
-function Setup({ onConnect }: { onConnect: (spreadsheetId: string) => void }) {
+/** `onChoose` shows Google's file picker; without it, they can only paste a link */
+function Setup({ onConnect, onChoose }: { onConnect: (spreadsheetId: string) => void, onChoose?: () => Promise<void> }) {
   const [url, setUrl] = useState('')
   const [error, setError] = useState<string>()
+  const [pickError, setPickError] = useState<string>()
 
   return (
-    <form
-      onSubmit={(event) => {
-        event.preventDefault()
-        const id = parseSpreadsheetId(url)
-        if (id) onConnect(id)
-        else setError('Paste the link to a Google Sheet')
-      }}
-    >
-      <Stack gap="sm">
-        <TextInput
-          label="Google Sheet"
-          description={`Share a sheet with everyone who should see the ${COLUMN_TITLE} column, then paste its link.`}
-          placeholder="https://docs.google.com/spreadsheets/d/…"
-          value={url}
-          error={error}
-          onChange={(event) => {
-            setUrl(event.currentTarget.value)
-            setError(undefined)
-          }}
-        />
-        <Button type="submit">Connect</Button>
-      </Stack>
-    </form>
+    <Stack gap="sm">
+      {onChoose && (
+        <>
+          <Text size="sm">{`Choose a Google Sheet shared with everyone who should see the ${COLUMN_TITLE} column.`}</Text>
+          {pickError && <Alert color="red" p="xs">{pickError}</Alert>}
+          <Button
+            onClick={() => {
+              setPickError(undefined)
+              onChoose().catch((e: unknown) => {
+                setPickError(message(e))
+              })
+            }}
+          >
+            Choose a Google Sheet
+          </Button>
+        </>
+      )}
+      <form
+        onSubmit={(event) => {
+          event.preventDefault()
+          const id = parseSpreadsheetId(url)
+          if (id) onConnect(id)
+          else setError('Paste the link to a Google Sheet')
+        }}
+      >
+        <Stack gap="sm">
+          <TextInput
+            label={onChoose ? 'Or paste its link' : 'Google Sheet'}
+            description={onChoose ? undefined : `Share a sheet with everyone who should see the ${COLUMN_TITLE} column, then paste its link.`}
+            placeholder="https://docs.google.com/spreadsheets/d/…"
+            value={url}
+            error={error}
+            onChange={(event) => {
+              setUrl(event.currentTarget.value)
+              setError(undefined)
+            }}
+          />
+          <Button type="submit" variant={onChoose ? 'default' : 'filled'}>Connect</Button>
+        </Stack>
+      </form>
+    </Stack>
   )
 }
