@@ -17,8 +17,10 @@ if (!clientId) console.warn('WEB_OAUTH_CLIENT_ID is not set, so Google sign-in w
 if (!pickerApiKey) console.warn('PICKER_API_KEY is not set, so Google\'s file picker may not open. See README.md.')
 
 const options: esbuild.BuildOptions = {
-  entryPoints: ['web/main.tsx'],
-  outfile: `${outdir}/app.js`,
+  // pick.js is for pick.html, which shows Google's file picker for the
+  // extension (see src/shared/picker.ts)
+  entryPoints: { app: 'web/main.tsx', pick: 'web/pickMain.ts' },
+  outdir,
   bundle: true,
   platform: 'browser',
   // iPads that can't update past iPadOS 16
@@ -41,6 +43,7 @@ const options: esbuild.BuildOptions = {
 await rm(outdir, { recursive: true, force: true })
 await mkdir(outdir, { recursive: true })
 await copyFile('web/index.html', `${outdir}/index.html`)
+await copyFile('web/pick.html', `${outdir}/pick.html`)
 await copyFile('icons/icon-128.png', `${outdir}/icon-128.png`)
 
 if (serve) {

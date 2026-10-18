@@ -3,6 +3,8 @@ import { fetchMemberList } from '../lcr/memberList'
 import type { Member } from '../lcr/members'
 import type { Consideration, Tracking } from '../shared/consideration'
 import type { BackgroundRequest, BackgroundResponses, Result } from '../shared/messages'
+import { PICKER_FRAME } from '../shared/picker'
+import { showPicker } from './picker'
 
 /** What the panel needs from the extension, so it can be tested without Chrome */
 export interface ExtensionApi {
@@ -17,6 +19,12 @@ export interface ExtensionApi {
   loadMembers: () => Promise<Member[]>
   /** Copies members' names into the sheet, for pages away from LCR */
   saveMembers: (spreadsheetId: string, members: Member[]) => Promise<void>
+  /**
+   * Shows Google's file picker over the page, on just `spreadsheetId` if
+   * given; resolves with the sheet chosen, or undefined if cancelled. Needs
+   * the web page, which shows it.
+   */
+  pickSheet?: (spreadsheetId?: string) => Promise<string | undefined>
 }
 
 async function send<T extends BackgroundRequest>(request: T): Promise<BackgroundResponses[T['type']]> {
@@ -45,4 +53,5 @@ export const chromeApi: ExtensionApi = {
     // only the id and name: the rest of LCR's member record stays out of the sheet
     await send({ type: 'saveMembers', spreadsheetId, members: members.map(({ uuid, name }) => ({ uuid, name })) })
   },
+  pickSheet: spreadsheetId => showPicker(document, chrome.runtime.getURL(PICKER_FRAME), spreadsheetId),
 }

@@ -10,6 +10,7 @@ import { HOLDER_SLOT, SLOT } from './page/enhance'
 import { SAVE_DELAY_MS } from './Tracker'
 
 const SHEET_ID = '1AbC-dEf_ghIJklMNopQRstuVWxyz0123456789'
+const WEB_URL = 'https://lcrcallings.click/app/'
 
 /** What's rendered into a calling's cell, inside its shadow root */
 const cell = (calling: string) => [...document.querySelectorAll(`[${SLOT}]`)]
@@ -327,17 +328,75 @@ describe('App', () => {
     assert.ok(await screen.findByText(/Tracking 2 callings/))
   })
 
-  it('opens the web page to choose a sheet the app hasn\'t been given access to, and connects on coming back', async () => {
+  it('chooses the first sheet in Google\'s picker, over the page', async () => {
+    const api = fakeApi()
+    api.pickResult = SHEET_ID
+    renderApp(api, undefined, WEB_URL)
+    const choose = await screen.findByRole('button', { name: 'Choose a Google Sheet' })
+    await act(async () => {
+      fireEvent.click(choose)
+      await Promise.resolve()
+    })
+    assert.deepEqual(api.picks, [undefined])
+    assert.ok(await screen.findByText(/Tracking 2 callings/))
+    assert.equal(await api.getSpreadsheetId(), SHEET_ID)
+  })
+
+  it('stays on setup when the picker is cancelled, and shows why it failed', async () => {
+    const api = fakeApi()
+    api.cancelPick = true
+    renderApp(api, undefined, WEB_URL)
+    const choose = await screen.findByRole('button', { name: 'Choose a Google Sheet' })
+    await act(async () => {
+      fireEvent.click(choose)
+      await Promise.resolve()
+    })
+    assert.ok(screen.getByLabelText(/Or paste its link/))
+
+    api.pickFailWith = 'Couldn\'t open Google\'s file picker.'
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Choose a Google Sheet' }))
+      await Promise.resolve()
+    })
+    assert.ok(await screen.findByText('Couldn\'t open Google\'s file picker.'))
+  })
+
+  it('only takes a link when built without the web page\'s address', async () => {
+    renderApp(fakeApi())
+    await screen.findByLabelText(/Google Sheet/)
+    assert.equal(screen.queryByRole('button', { name: 'Choose a Google Sheet' }), null)
+  })
+
+  it('shows Google\'s picker over the page on a sheet the app hasn\'t been given access to, then connects', async () => {
     const api = fakeApi({ spreadsheetId: SHEET_ID })
     api.blocked = true
     const opened = mock.method(window, 'open', () => null)
-    renderApp(api, undefined, 'https://lcrcallings.click/app/')
+    renderApp(api, undefined, WEB_URL)
     await screen.findByText(/only the sheets you choose/)
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Choose the sheet' }))
       await Promise.resolve()
     })
-    assert.equal(opened.mock.calls[0]?.arguments[0], `https://lcrcallings.click/app/?sheet=${SHEET_ID}`)
+    assert.deepEqual(api.picks, [SHEET_ID])
+    assert.ok(await screen.findByText(/Tracking 2 callings/))
+    assert.equal(opened.mock.callCount(), 0)
+    opened.mock.restore()
+  })
+
+  it('offers the web page if the picker fails, and connects on coming back', async () => {
+    const api = fakeApi({ spreadsheetId: SHEET_ID })
+    api.blocked = true
+    api.pickFailWith = 'Couldn\'t open Google\'s file picker.'
+    const opened = mock.method(window, 'open', () => null)
+    renderApp(api, undefined, WEB_URL)
+    await screen.findByText(/only the sheets you choose/)
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Choose the sheet' }))
+      await Promise.resolve()
+    })
+    assert.ok(await screen.findByText('Couldn\'t open Google\'s file picker.'))
+    fireEvent.click(screen.getByRole('button', { name: 'Open the web page' }))
+    assert.equal(opened.mock.calls[0]?.arguments[0], `${WEB_URL}?sheet=${SHEET_ID}`)
     opened.mock.restore()
 
     delete api.blocked
@@ -345,11 +404,11 @@ describe('App', () => {
     assert.ok(await screen.findByText(/Tracking 2 callings/))
   })
 
-  it('can\'t open the web page to give access when built without its address', async () => {
+  it('can\'t show the picker to give access when built without the web page\'s address', async () => {
     const api = fakeApi({ spreadsheetId: SHEET_ID })
     api.blocked = true
     renderApp(api)
-    assert.ok(await screen.findByText(/doesn't know where the web page is/))
+    assert.ok(await screen.findByText(/doesn't know where the .* web page is/))
     assert.equal(screen.queryByRole('button', { name: 'Choose the sheet' }), null)
   })
 
