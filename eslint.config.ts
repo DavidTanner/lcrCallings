@@ -6,7 +6,7 @@ import globals from 'globals'
 import tseslint from 'typescript-eslint'
 
 export default defineConfig(
-  { ignores: ['dist', 'public', 'node_modules'] },
+  { ignores: ['dist', 'public', 'build', 'node_modules'] },
   js.configs.recommended,
   tseslint.configs.strictTypeChecked,
   reactHooks.configs.flat['recommended-latest'],

@@ -15,6 +15,7 @@
     "demo:sheet": "tsx scripts/demo-sheet.ts",
     "web": "tsx scripts/web.ts --serve",
     "web:build": "tsx scripts/web.ts",
+    "notify:build": "tsx scripts/notify.ts",
     "site:build": "tsx scripts/site.ts",
     "pages:build": "npm run site:build && npm run web:build && npm run demo:build",
     "keygen": "tsx scripts/keygen.ts",
@@ -23,7 +24,7 @@
     "typecheck": "tsc",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "test": "node --import tsx --import ./test/setup.ts --test \"src/**/*.test.{ts,tsx}\" \"scripts/**/*.test.ts\" \"demo/**/*.test.ts\" \"web/**/*.test.{ts,tsx}\"",
+    "test": "node --import tsx --import ./test/setup.ts --test \"src/**/*.test.{ts,tsx}\" \"scripts/**/*.test.ts\" \"demo/**/*.test.ts\" \"web/**/*.test.{ts,tsx}\" \"notify/**/*.test.ts\"",
     "check": "npm run typecheck && npm run lint && npm test"
   },
   "dependencies": {
