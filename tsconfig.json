@@ -16,5 +16,5 @@
     "noEmit": true,
     "allowImportingTsExtensions": true,
   },
-  "include": ["src", "scripts", "test", "demo", "web", "eslint.config.ts"]
+  "include": ["src", "scripts", "test", "demo", "web", "notify", "eslint.config.ts"]
 }

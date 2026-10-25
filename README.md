@@ -172,6 +172,41 @@ Links from before the page moved to `/app/` (`/?sheet=…`) are sent on to it.
 Google's tokens last an hour. When one runs out the page keeps unsaved edits
 and shows **Save again**, which signs in again and saves them.
 
+## Interview emails
+
+`notify/` is an optional [Apps Script](https://developers.google.com/apps-script)
+for the sheet. Each Tuesday and Friday at 5pm it sends one email listing
+everyone whose status is **Schedule for Interview**: their name, the
+calling and organization, and their notes, with a link to the sheet. It
+sends everyone who's at that status at the time, so someone still waiting
+shows up again in the next email. If nobody is, it sends nothing. It runs in
+Google's servers in the account of whoever sets it up, and sends from their
+Gmail, not from the extension or the web page.
+
+Who gets it is set in a **Settings** tab in the sheet, with one row per
+status: `Status | Email`. Only the `Schedule for Interview` row is used for
+now. Put one address in the Email cell, or several separated by commas.
+
+To set it up, once, signed in as someone who can edit the sheet:
+
+1. `npm run notify:build` builds it into `build/notify.js`.
+2. In the sheet, open **Extensions → Apps Script**, replace what's in
+   `Code.gs` with the contents of `build/notify.js`, and save.
+3. Under **Project Settings**, set the **Time zone** to the ward's. The 5pm
+   is in that time zone, and Google runs it within 15 minutes of then.
+4. Back in the editor, choose `setup` from the function list and click
+   **Run**, then approve the permissions it asks for (the sheet, sending
+   email, and running on a schedule). It adds the Settings tab and schedules
+   the emails. Running it again replaces the schedule rather than adding
+   another.
+5. In the Settings tab, add who to email next to `Schedule for Interview`.
+
+To send one now, run `sendInterviewEmails`. If it runs with nobody in the
+Settings tab, it fails, and Google emails whoever set it up to say so. To
+update it, repeat steps 1 and 2. To stop it, delete the project or its
+triggers (the clock icon). Consumer Google accounts can send 100 emails a day
+from Apps Script, far more than this needs.
+
 ## Website
 
 `site/` is the public site at https://lcrcallings.click/: a home page that
@@ -258,6 +293,7 @@ make the release by hand.
 | `npm run web`       | Serves the [web page](#web-page) at http://127.0.0.1:8002/, rebuilding on each load (needs `WEB_OAUTH_CLIENT_ID` in `.env`) |
 | `npm run site:build` | Builds the [website](#website) into `public/`, emptying it first        |
 | `npm run web:build` | Builds the web page into `public/app/`, after `site:build`               |
+| `npm run notify:build` | Builds the [interview emails](#interview-emails) Apps Script into `build/notify.js` |
 | `npm run pages:build` | Builds the website, web page and demo into `public/`, as published to GitHub Pages |
 | `npm run members -- [file]` | Prints the members in a saved LCR page payload as JSON (default `resources/mltRecordsMemberList.txt`) |
 | `npm test`          | Runs `node:test` over `src/**/*.test.{ts,tsx}` and `scripts/**/*.test.ts` |
@@ -332,6 +368,11 @@ they're out of date.
   and, through `pick.html` (`pick.ts`), for the extension; the page reuses
   the extension's candidate field (`src/CandidatesField.tsx`) and editing
   and saving (`src/useConsiderations.ts`).
+- `notify/index.ts` is the [interview emails](#interview-emails) Apps Script.
+  It reads the sheet with the same parsing as the extension
+  (`src/background/sheets.ts`). `scripts/notify.ts` bundles it into one file
+  with a top-level function for each one Apps Script runs, since Apps Script
+  has no modules.
 - `scripts/manifest.ts` generates `manifest.json` from `package.json` and
   `.env`.
 - `scripts/webstore.ts` talks to the Chrome Web Store API as a service

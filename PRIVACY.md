@@ -1,6 +1,6 @@
 # Privacy Policy
 
-_Last updated: October 16, 2026_
+_Last updated: October 25, 2026_
 
 This policy covers **LCR Callings**: the LCR Callings Chrome extension and the
 LCR Callings web app at [https://lcrcallings.click/](https://lcrcallings.click/)
@@ -48,7 +48,8 @@ In that sheet, the app reads and writes two tabs that it adds:
 - **Members**: the LCR member id and name of each member of your unit, so the
   web app can show names. Nothing else about members is copied.
 
-The app does not read or change any other tab in the sheet.
+The app does not read or change any other tab in the sheet, except the
+Settings tab for the optional interview emails (below).
 
 ### Leader and Clerk Resources (Chrome extension only)
 
@@ -57,6 +58,17 @@ who holds them, and fetches your unit's member list from LCR's Member List
 page using your existing LCR session, so you can pick members by name. It
 copies only each member's LCR member id and name into the sheet's Members
 tab. It does not change anything in LCR.
+
+### Interview emails (optional)
+
+A leader can add an optional Google Apps Script to the sheet that emails
+leaders a list of the members whose status is "Schedule for Interview". It
+runs in Google Apps Script, in the Google account of whoever adds it, and
+sends from their Gmail. It reads the Considering and Members tabs and a
+Settings tab that lists who to email. Each email holds those members' names,
+the callings they're being considered for and their notes, and goes only to
+the addresses in the Settings tab. The developer never receives these
+emails or anything else from the script.
 
 ### Settings kept in your browser
 
@@ -94,6 +106,8 @@ The only places data is sent are:
   in Google Drive, which you control.
 - **LCR**, to read the Organizations and Member List pages you already have
   access to.
+- If you add the optional interview emails, **the people listed in the
+  sheet's Settings tab**, by email from the account of whoever added it.
 
 The app's web pages are static files hosted on GitHub Pages. Like any web
 host, GitHub may record technical information such as your IP address when
@@ -130,6 +144,8 @@ from Google APIs is:
 - **Sheet data** stays in your Google Sheet until you or someone the sheet is
   shared with deletes it. To delete it, delete the Considering and Members
   tabs, or the whole sheet.
+- **Interview emails** stay in the senders' and recipients' mailboxes. To
+  stop them, delete the sheet's Apps Script project or its triggers.
 - **Browser settings** are deleted when you remove the extension or clear the
   web app's site data in your browser.
 
