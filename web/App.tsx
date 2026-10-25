@@ -2,6 +2,7 @@ import { Alert, Anchor, Button, Container, Group, Loader, Stack, Text, Title } f
 import { type ReactNode, useCallback, useEffect, useState } from 'react'
 import { needsAccess, type SheetMember } from '../src/background/sheets'
 import { APP_NAME } from '../src/constants'
+import { message } from '../src/shared/errors'
 import type { Consideration } from '../src/shared/consideration'
 import { Board, type WebApi } from './Board'
 import { type GoogleAuth, SignInRequired } from './google'
@@ -28,8 +29,6 @@ type State
     | { step: 'needsAccess', error?: string }
     | { step: 'ready', rows: Consideration[], members: SheetMember[] }
     | { step: 'failed', error: string }
-
-const message = (error: unknown) => error instanceof Error ? error.message : String(error)
 
 /** The page for people who can't install the extension: the sheet's callings, editable */
 export function WebApp({ auth, api, spreadsheetId: initialId, onSpreadsheetId, pageUrl, pickSheet }: WebAppProps) {

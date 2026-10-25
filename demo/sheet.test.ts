@@ -6,7 +6,7 @@ import { enhancePage } from '../src/page/enhance'
 import type { Consideration } from '../src/shared/consideration'
 import { MEMBERS, ORGANIZATIONS, SEED_SHEET } from './data'
 import { organizationsHtml } from './page'
-import { demoConsiderations, demoSheetCsv } from './sheet'
+import { DEMO_UPDATED, demoConsiderations, demoSheetCsv } from './sheet'
 
 /** Just enough CSV parsing for the demo files: quoted cells may hold commas, quotes and newlines */
 function parseCsv(text: string): string[][] {
@@ -42,10 +42,11 @@ function parseCsv(text: string): string[][] {
 describe('demo sheet', () => {
   it('has every calling on the mock page, where the extension would put it', () => {
     document.body.innerHTML = organizationsHtml(ORGANIZATIONS)
-    const { rows, cleanup } = enhancePage(document)
     const place = ({ key, calling, member, organization, position }: Omit<Consideration, 'candidates'>) => ({ key, calling, member, organization, position })
-    const onPage = rows().map(place)
-    cleanup()
+    let onPage: ReturnType<typeof place>[] = []
+    enhancePage(document, (rows) => {
+      onPage = rows.map(place)
+    }).cleanup()
 
     assert.deepEqual(demoConsiderations().map(place), onPage)
   })
@@ -55,7 +56,7 @@ describe('demo sheet', () => {
     const [header, ...rows] = parseCsv(files['Considering.csv'] ?? '')
     assert.deepEqual(header, HEADER)
     const read = new Map(rows.map(row => [row[0], trackingIn(row)]))
-    for (const [key, tracked] of Object.entries(SEED_SHEET)) assert.deepEqual(read.get(key), tracked)
+    for (const [key, tracked] of Object.entries(SEED_SHEET)) assert.deepEqual(read.get(key), { ...tracked, updated: DEMO_UPDATED })
     assert.deepEqual(rows.map(placementIn), demoConsiderations().map(({ organization, position }) => ({ organization, position })))
 
     const [membersHeader, ...members] = parseCsv(files['Members.csv'] ?? '')

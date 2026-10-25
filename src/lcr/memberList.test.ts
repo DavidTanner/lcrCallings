@@ -42,8 +42,8 @@ describe('fetchMemberList', () => {
     const lcr = fakeLcr(() => new Response(payload, { headers: { 'content-type': 'text/x-component' } }))
     await fetchMemberList(ORIGIN, lcr.fetchFn)
     assert.deepEqual(lcr.calls, [{
-      url: `${ORIGIN}${MEMBER_LIST_PATH}`,
-      init: { headers: { RSC: '1' } },
+      url: `${ORIGIN}${MEMBER_LIST_PATH}?lang=eng`,
+      init: { headers: { RSC: '1' }, redirect: 'manual' },
     }])
   })
 
@@ -60,8 +60,10 @@ describe('fetchMemberList', () => {
   })
 
   it('asks the user to sign in again when LCR redirects', async () => {
-    const lcr = fakeLcr(() => new Response(null, { status: 302, headers: { location: 'https://id.example.org' } }))
+    // what a browser gives a `redirect: 'manual'` fetch: no status, no location
+    const lcr = fakeLcr(() => Object.defineProperty(Response.error(), 'type', { value: 'opaqueredirect' }))
     await assert.rejects(fetchMemberList(ORIGIN, lcr.fetchFn), /sign in again/)
+    assert.equal(lcr.calls[0]?.init.redirect, 'manual')
   })
 
   it('reports HTTP errors', async () => {
@@ -116,11 +118,12 @@ describe('fetchMemberList, when the page loads members with a Server Action', ()
     const lcr = actionLcr(reference(ACTION_ID, 'getMemberList'))
     const members = await fetchMemberList(ORIGIN, lcr.fetchFn, 'spa')
     assert.deepEqual(members.map(m => m.uuid), ['u1', 'u2'])
-    assert.deepEqual(lcr.calls.map(c => c.url), [`${ORIGIN}${MEMBER_LIST_PATH}`, `${ORIGIN}${CHUNK}`, `${ORIGIN}${MEMBER_LIST_PATH}?lang=spa`])
+    assert.deepEqual(lcr.calls.map(c => c.url), [`${ORIGIN}${MEMBER_LIST_PATH}?lang=spa`, `${ORIGIN}${CHUNK}`, `${ORIGIN}${MEMBER_LIST_PATH}?lang=spa`])
     assert.deepEqual(lcr.calls[2]?.init, {
       method: 'POST',
       headers: { 'Accept': 'text/x-component', 'Content-Type': 'text/plain;charset=UTF-8', 'Next-Action': ACTION_ID },
       body: '["$undefined","spa"]',
+      redirect: 'manual',
     })
   })
 

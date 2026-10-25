@@ -19,7 +19,7 @@ function fakeGoogle({ tabs = [SHEET_TITLE], rows = [HEADER] as string[][], membe
     const forced = status?.shift()
     if (forced) return reply({ error: { message: `status ${String(forced)}` } }, forced)
     if (url.endsWith('?fields=sheets.properties.title')) return reply({ sheets: tabs.map(title => ({ properties: { title } })) })
-    if (url.includes(`${RANGE}A%3AA`)) return reply({ values: rows.map(([key = '']) => [key]) })
+    if (url.includes(`${RANGE}A%3AE`)) return reply({ values: rows.map(row => row.slice(0, 5)) })
     if (url.includes(`${RANGE}A1%3AK1`)) return reply({ values: rows.slice(0, 1) })
     if (url.includes(`${RANGE}A2%3AK`)) return reply({ values: rows.slice(1) })
     if (method === 'GET' && url.endsWith(`${RANGE}A%3AK`)) return reply({ values: rows })
@@ -122,10 +122,30 @@ describe('createSheetsClient', () => {
 
   it('appends a row for a new key', async () => {
     const google = fakeGoogle()
-    await createSheetsClient(tokens(), google.fetchFn).save(ID, consideration)
+    const updated = await createSheetsClient(tokens(), google.fetchFn).save(ID, consideration)
     const write = google.calls.at(-1)
     assert.equal(write?.method, 'POST')
     assert.match(write.url, /A%3AK:append\?valueInputOption=RAW&insertDataOption=INSERT_ROWS$/)
+    assert.equal((write.body as { values: string[][] }).values[0]?.[4], updated)
+  })
+
+  it('refuses to save over a row changed since it was loaded', async () => {
+    const rows = [HEADER, [consideration.key, 'Bishop', 'p1', '', 'stamp1']]
+    const google = fakeGoogle({ rows })
+    const client = createSheetsClient(tokens(), google.fetchFn)
+    const { [consideration.key]: loaded } = await client.load(ID)
+    assert.equal(loaded?.updated, 'stamp1')
+
+    rows[1] = [consideration.key, 'Bishop', 'p1', 'm9', 'stamp2']
+    await assert.rejects(client.save(ID, { ...consideration, updated: 'stamp1' }), { status: 409, message: /Press Refresh/ })
+    // nor without the Updated it was loaded with, as for a row someone else added
+    await assert.rejects(client.save(ID, consideration), { status: 409 })
+    assert.equal(google.calls.filter(c => c.method !== 'GET').length, 0)
+
+    const updated = await client.save(ID, { ...consideration, updated: 'stamp2' })
+    const write = google.calls.at(-1)
+    assert.equal(write?.method, 'PUT')
+    assert.equal((write.body as { values: string[][] }).values[0]?.[4], updated)
   })
 
   it('appends rows for keys not in the sheet yet in one request', async () => {
@@ -136,8 +156,22 @@ describe('createSheetsClient', () => {
     const writes = google.calls.filter(c => c.method !== 'GET')
     assert.equal(writes.length, 1)
     assert.match(writes[0]?.url ?? '', /A%3AK:append\?valueInputOption=RAW&insertDataOption=INSERT_ROWS$/)
-    const [[key, calling, member, considering, , notes, data, status, organization, position, holderStatus] = []] = (writes[0]?.body as { values: string[][] }).values
-    assert.deepEqual([key, calling, member, considering, notes, data, status, organization, position, holderStatus], ['Ward Clerk|vacant|0', 'Ward Clerk', '', '', '', '', '', '', '', ''])
+    const [[key, calling, member, considering, updated, notes, data, status, organization, position, holderStatus] = []] = (writes[0]?.body as { values: string[][] }).values
+    assert.deepEqual([key, calling, member, considering, updated, notes, data, status, organization, position, holderStatus], ['Ward Clerk|vacant|0', 'Ward Clerk', '', '', '', '', '', '', '', '', ''])
+  })
+
+  it('uses the newer of two rows for a key over an empty one sync added after it', async () => {
+    const data = JSON.stringify(consideration.candidates)
+    const rows = [HEADER, [consideration.key, 'Bishop', 'p1', 'm1\nm2', 'stamp1', '', data], [consideration.key, 'Bishop', 'p1', '', '']]
+    const google = fakeGoogle({ rows })
+    const client = createSheetsClient(tokens(), google.fetchFn)
+    const { [consideration.key]: loaded } = await client.load(ID)
+    assert.deepEqual(loaded, { candidates: consideration.candidates, updated: 'stamp1' })
+
+    await client.save(ID, { ...consideration, updated: 'stamp1' })
+    const write = google.calls.at(-1)
+    assert.equal(write?.method, 'PUT')
+    assert.match(write.url, new RegExp(`^${ID}/values/${RANGE}A2%3AK2\\?valueInputOption=RAW$`))
   })
 
   it('writes nothing when every key is already in the sheet, where the page has it', async () => {

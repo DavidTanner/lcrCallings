@@ -11,6 +11,7 @@ import { type CallingRow, enhancePage } from './page/enhance'
 import { shadowContainer } from './shadow'
 import { ShareLinkButton } from './ShareLinkButton'
 import { type Candidate, type Consideration, consideration, type Tracking } from './shared/consideration'
+import { message } from './shared/errors'
 import { spreadsheetUrl } from './shared/spreadsheet'
 import { useConsiderations } from './useConsiderations'
 
@@ -19,7 +20,6 @@ export { SAVE_DELAY_MS } from './useConsiderations'
 const NO_CANDIDATES: Candidate[] = []
 const NOTHING_TRACKED: Tracking = { candidates: NO_CANDIDATES }
 
-const message = (error: unknown) => error instanceof Error ? error.message : String(error)
 const sameRows = (a: CallingRow[], b: CallingRow[]) => a.length === b.length && a.every((row, i) => row === b[i])
 
 /**
@@ -118,6 +118,8 @@ export function Tracker({ doc, api, spreadsheetId, initial, webUrl, onChangeShee
   const refresh = async () => {
     setRefreshing(true)
     try {
+      // let saves land first, or the load shows the sheet without them
+      await settle()
       replace(await api.load(spreadsheetId))
       setError(undefined)
     }

@@ -53,7 +53,7 @@ function fakeApi(auth: GoogleAuth, rows = ROWS, members = MEMBERS) {
     if (api.blocked) return Promise.reject(new SheetsError(404, 'Requested entity was not found.'))
     return Promise.resolve()
   }
-  const api: WebApi & { saved: Consideration[], blocked: boolean } = {
+  const api: WebApi & { saved: Consideration[], blocked: boolean, conflict?: boolean } = {
     saved,
     blocked: false,
     loadRows: async () => {
@@ -66,7 +66,9 @@ function fakeApi(auth: GoogleAuth, rows = ROWS, members = MEMBERS) {
     },
     save: async (_id, consideration) => {
       await signedIn()
+      if (api.conflict) throw new SheetsError(409, 'Someone else changed this calling since you loaded it.')
       saved.push(consideration)
+      return `stamp${String(saved.length)}`
     },
   }
   return api
@@ -272,6 +274,26 @@ describe('WebApp', () => {
     await click(screen.getByRole('button', { name: 'Save again' }))
     assert.equal(auth.signIns, 1)
     assert.deepEqual(api.saved.map(c => c.candidates[0]?.notes), ['Ask in May'])
+  })
+
+  it('drops an edit refused for someone else\'s change, showing theirs on refresh', async () => {
+    const auth = fakeAuth(true)
+    const rows = structuredClone(ROWS)
+    const api = fakeApi(auth, rows)
+    renderApp(auth, api)
+    const notes = await screen.findByLabelText<HTMLTextAreaElement>('Notes on Abel, Bea for Ward Clerk')
+    rows[1] = { key: 'Ward Clerk|vacant|0', calling: 'Ward Clerk', member: '', candidates: [{ id: 'm1', notes: 'Theirs' }] }
+    api.conflict = true
+    await act(async () => {
+      fireEvent.change(notes, { target: { value: 'Mine' } })
+      fireEvent.blur(notes)
+      await Promise.resolve()
+    })
+    assert.ok(await screen.findByText(/Not saved: Someone else changed this calling/))
+    assert.equal(screen.queryByRole('button', { name: 'Save again' }), null)
+
+    await click(screen.getByRole('button', { name: 'Refresh' }))
+    assert.equal(screen.getByLabelText<HTMLTextAreaElement>('Notes on Abel, Bea for Ward Clerk').value, 'Theirs')
   })
 
   it('copies a link to this page that opens the sheet', async () => {

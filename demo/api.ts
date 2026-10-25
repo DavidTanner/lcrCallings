@@ -61,6 +61,8 @@ export function demoApi({ storage = memoryStorage(), delayMs = 400 }: DemoApiOpt
       // like the real sheet, the row stays when its candidates are cleared
       sheet[consideration.key] = tracking(consideration)
       storage.setItem(SHEET_KEY, JSON.stringify(sheet))
+      // nobody else edits the pretend sheet, so there's nothing to check it against
+      return new Date().toISOString()
     },
     sync: async (_id, considerations) => {
       await wait(null)

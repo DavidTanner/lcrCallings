@@ -12,7 +12,7 @@ export interface ManifestOptions {
   clientId?: string
   /** public key (base64 DER) that pins the extension id; see scripts/keygen.ts */
   key?: string
-  /** also run on the dev server's demo page */
+  /** add " (dev)" to the name, for the unpacked build */
   dev?: boolean
 }
 

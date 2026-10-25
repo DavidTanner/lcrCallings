@@ -60,10 +60,9 @@ export function memberListAction(actions: ServerAction[]): ServerAction | undefi
 }
 
 async function lcrFetch(url: string, init: RequestInit, fetchFn: FetchFn): Promise<Response> {
-  const response = await fetchFn(url, {
-    ...init,
-  })
-  if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
+  // an expired session redirects to the sign-in host, which a followed fetch hits as a CORS failure
+  const response = await fetchFn(url, { ...init, redirect: 'manual' })
+  if (response.type === 'opaqueredirect') {
     throw new Error('LCR wants you to sign in again. Reload the page, then try again.')
   }
   return response
@@ -83,6 +82,8 @@ async function lcrFetch(url: string, init: RequestInit, fetchFn: FetchFn): Promi
  */
 export async function fetchMemberList(origin: string, fetchFn: FetchFn = fetch, lang = 'eng'): Promise<Member[]> {
   const url = new URL(MEMBER_LIST_PATH, origin)
+  // the URL LCR links to itself, so a signed-in request isn't redirected to add it
+  url.searchParams.set('lang', lang)
   const response = await lcrFetch(url.href, { headers: { RSC: '1' } }, fetchFn)
   if (!response.ok) throw new Error(`LCR's member list failed to load (HTTP ${String(response.status)})`)
 
@@ -91,18 +92,16 @@ export async function fetchMemberList(origin: string, fetchFn: FetchFn = fetch, 
   const members = parseMembers(isHtml ? flightFromHtml(body) : body)
   if (members.length) return members
 
-  const actions: ServerAction[] = []
-  for (const script of scriptUrls(body)) {
+  const actions = (await Promise.all(scriptUrls(body).map(async (script) => {
     const js = await lcrFetch(new URL(script, origin).href, {}, fetchFn)
-    if (js.ok) actions.push(...serverActions(await js.text()))
-  }
+    return js.ok ? serverActions(await js.text()) : []
+  }))).flat()
   const action = memberListAction(actions)
   if (!action) {
     const names = actions.map(a => a.name).join(', ') || 'none'
     throw new Error(`Couldn't find how LCR's member list loads its members (actions found: ${names})`)
   }
 
-  url.searchParams.set('lang', lang)
   const result = await lcrFetch(url.href, {
     method: 'POST',
     headers: { 'Accept': 'text/x-component', 'Content-Type': 'text/plain;charset=UTF-8', 'Next-Action': action.id },

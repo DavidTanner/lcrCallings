@@ -41,7 +41,7 @@ copies each member's id and name (nothing else) into a `Members` tab in the
 sheet, for the [web page](#web-page).
 
 The extension keeps its rows in a `Considering` tab it adds to the sheet:
-`Key | Calling | Held by | Considering | Updated | Notes | Data | Status | Organization | Position`. Members are
+`Key | Calling | Held by | Considering | Updated | Notes | Data | Status | Organization | Position | Holder status`. Members are
 recorded by their LCR member id (uuid), never by name, since members can share
 a name: Held by is the current holder's id, Considering lists each candidate's
 id, Notes are `<id>: <notes>`, Status is `<id>: <status>`, and Data (JSON) is
@@ -49,10 +49,16 @@ id, Notes are `<id>: <notes>`, Status is `<id>: <status>`, and Data (JSON) is
 Organization is the headings the calling is under on the Organizations page,
 joined with ` > ` (e.g. `Aaronic Priesthood Quorums > Priests Quorum > Priests
 Quorum Presidency`), and Position is its place on the page, from 0, so the web
-page can group and order callings as LCR does.
+page can group and order callings as LCR does. Holder status is where whoever
+holds the calling now is, e.g. `Considering Release` or `Fill/Change`.
 The extension shows names from LCR's member list; anyone no longer in it shows
 by their id. The key identifies the row by calling, current holder's member id
-and occurrence, so an entry stops showing once the calling changes hands. The
+and occurrence, so an entry stops showing once the calling changes hands.
+Updated is when the row was last saved from the extension or web page (blank
+for rows **Sync all callings** added; edits made by hand in the sheet don't
+change it), and a save is refused if someone else saved the row since you
+loaded it. Where a key is in more than one row, the one with the newest Updated
+is used. The
 extension reads candidates back from Data, so edits made in the sheet itself
 should go there. Rows from before candidates were picked from the member list
 show their Considering text as a candidate.
@@ -96,7 +102,8 @@ sign in there with the same Google account as Chrome.
 Google only issues tokens to an OAuth client tied to the extension's id, so:
 
 1. `npm run keygen` adds `EXTENSION_KEY` to `.env` (git-ignored) and prints
-   the extension id. The key keeps the id the same wherever it's loaded.
+   the extension id. `npm run dev` puts the key in its build, so the id is
+   the same wherever that build is loaded unpacked.
 2. In [Google Cloud Console](https://console.cloud.google.com/), in a project:
    - enable the **Google Sheets API** and the **Google Picker API**
    - configure the **OAuth consent screen** (External, Testing) and add each
@@ -105,12 +112,14 @@ Google only issues tokens to an OAuth client tied to the extension's id, so:
    - create an **OAuth client ID** of type **Chrome Extension** with the id
      from step 1
 3. Add the client id to `.env` as `OAUTH_CLIENT_ID=….apps.googleusercontent.com`.
-4. `npm run build`, then in `chrome://extensions` turn on Developer mode,
-   **Load unpacked**, and pick `dist/`.
+4. `npm run dev`, then in `chrome://extensions` turn on Developer mode,
+   **Load unpacked**, and pick `dist/`. (`npm run build` leaves the key out,
+   for the store, so loaded unpacked it gets a different id and sign-in
+   fails.)
 
 Chrome must be signed in to the Google account that has access to the sheet.
 
-To share it, send others the built `dist/` folder to load unpacked, or publish
+To share it, send others the `dist/` folder from `npm run dev` to load unpacked, or publish
 it to the Chrome Web Store as unlisted (see [Releasing](#releasing); the
 store assigns its own id, so add that id to the OAuth client too).
 
@@ -248,8 +257,8 @@ make the release by hand.
 
 | Command             | What it does                                                             |
 | ------------------- | ------------------------------------------------------------------------ |
-| `npm run build`     | Builds the extension into `dist/`                                        |
-| `npm run dev`       | Rebuilds `dist/` on change (reload the extension in `chrome://extensions` to pick it up). If `resources/existingCallingsPage.html` exists it's served at http://127.0.0.1:8000/demo.html, where the dev build also runs, and `resources/mltRecordsMemberList.txt` answers its member list requests |
+| `npm run build`     | Builds the extension into `dist/` for the Chrome Web Store, without the key, so the store assigns its id |
+| `npm run dev`       | Builds `dist/` once to load unpacked, with `EXTENSION_KEY` from `.env` pinning the id, named "(dev)". Run it again and reload the extension in `chrome://extensions` to pick up changes |
 | `npm run demo`      | Serves a mock Organizations page at http://127.0.0.1:8001/ that runs the panel without Chrome, Google or real member data (see [Demo](#demo)) |
 | `npm run demo:build` | Builds the demo into `public/demo/`, after `site:build` (which empties `public/`) |
 | `npm run demo:sheet` | Writes the demo ward to `demo/sheet/` as CSV files to import into a Google Sheet (see [Demo sheet](#demo-sheet)) |
