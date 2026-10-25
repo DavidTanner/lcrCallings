@@ -5,6 +5,7 @@ import { CandidatesField, candidateName } from '../src/CandidatesField'
 import { HolderStatusField, VACANT_COLOR } from '../src/HolderStatusField'
 import { ShareLinkButton } from '../src/ShareLinkButton'
 import { type Candidate, type Consideration, HOLDER_STATUS_COLORS, tracking } from '../src/shared/consideration'
+import { message } from '../src/shared/errors'
 import { spreadsheetUrl } from '../src/shared/spreadsheet'
 import { type CallingInfo, useConsiderations } from '../src/useConsiderations'
 import { OrganizationPicker } from './OrganizationPicker'
@@ -14,8 +15,6 @@ import { byOrganization, UNGROUPED } from './organizations'
 export type WebApi = Pick<SheetsClient, 'loadRows' | 'loadMembers' | 'save'>
 
 const NO_CANDIDATES: Candidate[] = []
-
-const message = (error: unknown) => error instanceof Error ? error.message : String(error)
 
 type Show = 'all' | 'considering' | 'vacant'
 
@@ -42,7 +41,7 @@ export function Board({ api, spreadsheetId, rows: initialRows, members: initialM
 
   const initial = useMemo(() => Object.fromEntries(initialRows.map(r => [r.key, tracking(r)])), [initialRows])
   const save = useCallback((consideration: Consideration) => api.save(spreadsheetId, consideration), [api, spreadsheetId])
-  const { values, change, changeHolderStatus, flush, retry, replace, saving, unsaved, error, setError } = useConsiderations(initial, save)
+  const { values, change, changeHolderStatus, flush, settle, retry, replace, saving, unsaved, error, setError } = useConsiderations(initial, save)
 
   const options = useMemo(() => members.map(m => ({ value: m.uuid, label: m.name })), [members])
   const names = useMemo(() => new Map(options.map(o => [o.value, o.label])), [options])
@@ -51,6 +50,8 @@ export function Board({ api, spreadsheetId, rows: initialRows, members: initialM
     setRefreshing(true)
     try {
       await ensureSignedIn()
+      // let saves land first, or the load shows the sheet without them
+      await settle()
       const [rows, fresh] = await Promise.all([api.loadRows(spreadsheetId), api.loadMembers(spreadsheetId)])
       setCallings(rows)
       setMembers(fresh)

@@ -1,3 +1,4 @@
+import { message } from '../shared/errors'
 import type { BackgroundRequest, BackgroundResponses, Result, ToggleMessage } from '../shared/messages'
 import { createSheetsClient, SheetsError } from './sheets'
 
@@ -15,8 +16,7 @@ async function handle(request: BackgroundRequest): Promise<BackgroundResponses[B
     case 'load':
       return sheets.load(request.spreadsheetId)
     case 'save':
-      await sheets.save(request.spreadsheetId, request.consideration)
-      return null
+      return sheets.save(request.spreadsheetId, request.consideration)
     case 'sync':
       return sheets.sync(request.spreadsheetId, request.considerations)
     case 'saveMembers':
@@ -33,7 +33,7 @@ chrome.runtime.onMessage.addListener((request: BackgroundRequest, _sender, sendR
     (error: unknown) => {
       sendResponse({
         ok: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: message(error),
         ...(error instanceof SheetsError ? { status: error.status } : {}),
       })
     },

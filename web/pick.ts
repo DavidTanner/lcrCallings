@@ -1,3 +1,4 @@
+import { message } from '../src/shared/errors'
 import type { PickReady, PickRequest, PickResult } from '../src/shared/picker'
 import { type Picker, pickSpreadsheet, projectNumber } from './picker'
 
@@ -10,8 +11,6 @@ export interface AnswerPicksOptions {
   /** `google.picker`, loaded the first time it's needed */
   load: () => Promise<Picker>
 }
-
-const message = (error: unknown) => error instanceof Error ? error.message : String(error)
 
 /**
  * The origin of the page at the top of the frames, e.g. LCR's: the picker

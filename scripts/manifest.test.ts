@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { generateKeyPairSync } from 'node:crypto'
 import { describe, it } from 'node:test'
+import { APP_NAME } from '../src/constants'
 import { buildManifest, DRIVE_FILE_SCOPE, extensionId, LCR_MATCH } from './manifest'
 
 describe('buildManifest', () => {
@@ -16,8 +17,9 @@ describe('buildManifest', () => {
     assert.equal(DRIVE_FILE_SCOPE, 'https://www.googleapis.com/auth/drive.file')
   })
 
-  it('also runs on the demo page in dev', () => {
+  it('names the dev build and runs only on LCR', () => {
     const manifest = buildManifest({ version: '1', description: 'd', dev: true })
+    assert.equal(manifest.name, `${APP_NAME} (dev)`)
     assert.deepEqual(manifest.content_scripts?.[0]?.matches, [LCR_MATCH])
     assert.equal(manifest.oauth2, undefined)
   })

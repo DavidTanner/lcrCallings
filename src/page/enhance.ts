@@ -81,8 +81,6 @@ function tableOrganizations(doc: Document) {
 }
 
 export interface Enhancement {
-  /** The calling rows currently enhanced, in page order */
-  rows: () => CallingRow[]
   /** Removes everything that was added to the page */
   cleanup: () => void
 }
@@ -95,7 +93,6 @@ export interface Enhancement {
  * each pass; a row that's still on the page is the same object every time.
  */
 export function enhancePage(doc: Document, onApply?: (rows: CallingRow[]) => void): Enhancement {
-  let rows: CallingRow[] = []
   const rowFor = new WeakMap<Element, CallingRow>()
 
   const apply = () => {
@@ -151,8 +148,7 @@ export function enhancePage(doc: Document, onApply?: (rows: CallingRow[]) => voi
         found.push(row)
       }
     }
-    rows = found
-    onApply?.(rows)
+    onApply?.(found)
   }
 
   // LCR is a React app, so re-apply whenever it re-renders. Our own changes
@@ -171,7 +167,6 @@ export function enhancePage(doc: Document, onApply?: (rows: CallingRow[]) => voi
   observer.observe(doc.body, { childList: true, subtree: true })
 
   return {
-    rows: () => rows,
     cleanup: () => {
       observer.disconnect()
       for (const el of doc.querySelectorAll(`[${ADDED}]`)) el.remove()

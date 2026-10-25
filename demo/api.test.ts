@@ -42,9 +42,10 @@ describe('demo', () => {
 
   it('seeds only rows that are on the mock page', () => {
     document.body.innerHTML = organizationsHtml(ORGANIZATIONS)
-    const { rows, cleanup } = enhancePage(document)
-    const keys = new Set(rows().map(row => row.key))
-    cleanup()
+    let keys = new Set<string>()
+    enhancePage(document, (rows) => {
+      keys = new Set(rows.map(row => row.key))
+    }).cleanup()
 
     const names = new Set(MEMBERS.map(m => m.uuid))
     for (const [key, { candidates }] of Object.entries(SEED_SHEET)) {

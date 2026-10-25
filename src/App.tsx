@@ -5,6 +5,7 @@ import { APP_NAME } from './constants'
 import type { ExtensionApi } from './content/api'
 import { COLUMN_TITLE } from './page/enhance'
 import type { Tracking } from './shared/consideration'
+import { message } from './shared/errors'
 import { parseSpreadsheetId, webPageLink } from './shared/spreadsheet'
 import { Tracker } from './Tracker'
 
@@ -25,8 +26,6 @@ type State
     | { step: 'failed', spreadsheetId: string, error: string }
     /** `opened` once the web page is open to choose the sheet in; `error` if Google's picker failed */
     | { step: 'needsAccess', spreadsheetId: string, opened: boolean, error?: string }
-
-const message = (error: unknown) => error instanceof Error ? error.message : String(error)
 
 export function App({ doc, api, onClose, webUrl }: AppProps) {
   const [state, setState] = useState<State>({ step: 'starting' })

@@ -57,6 +57,11 @@ export interface Tracking {
   candidates: Candidate[]
   /** left out until one is picked, and for vacant callings */
   holderStatus?: HolderStatus
+  /**
+   * The row's Updated cell as last loaded or saved, which a save must still
+   * find there; left out for rows not in the sheet yet
+   */
+  updated?: string
 }
 
 /** Who is being considered for one calling row on the Organizations page */
@@ -90,4 +95,4 @@ export function consideration({ key, calling, member, organization, position }: 
 }
 
 /** Just what's tracked of a consideration */
-export const tracking = ({ candidates, holderStatus }: Tracking): Tracking => ({ candidates, ...(holderStatus ? { holderStatus } : {}) })
+export const tracking = ({ candidates, holderStatus, updated }: Tracking): Tracking => ({ candidates, ...(holderStatus ? { holderStatus } : {}), ...(updated ? { updated } : {}) })

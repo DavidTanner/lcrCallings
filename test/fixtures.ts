@@ -54,7 +54,7 @@ export function fakeApi({ spreadsheetId, sheet = {}, members = MEMBERS }: FakeAp
       if (api.failWith) return Promise.reject(new Error(api.failWith))
       saved.push(consideration)
       api.sheet[consideration.key] = tracking(consideration)
-      return Promise.resolve()
+      return Promise.resolve(`stamp${String(saved.length)}`)
     },
     sync: (_id, considerations) => {
       if (api.failWith) return Promise.reject(new Error(api.failWith))

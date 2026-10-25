@@ -11,7 +11,8 @@ export type BackgroundRequest
 export interface BackgroundResponses {
   /** key → who is being considered, and where the holder is */
   load: Record<string, Tracking>
-  save: null
+  /** the row's new Updated */
+  save: string
   /** how many rows were added */
   sync: number
   saveMembers: null

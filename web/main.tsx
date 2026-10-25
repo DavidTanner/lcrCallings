@@ -3,6 +3,7 @@ import mantineCss from '@mantine/core/styles.css'
 import { StrictMode, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createSheetsClient } from '../src/background/sheets'
+import { message } from '../src/shared/errors'
 import { parseSpreadsheetId } from '../src/shared/spreadsheet'
 import { WebApp } from './App'
 import type { WebApi } from './Board'
@@ -67,7 +68,7 @@ function Root() {
         setGoogle({ auth, api: createSheetsClient(auth.tokens) })
       },
       (e: unknown) => {
-        setError(e instanceof Error ? e.message : String(e))
+        setError(message(e))
       },
     )
   }, [])

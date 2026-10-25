@@ -247,6 +247,38 @@ describe('App', () => {
     assert.equal(notes('Bishop', 'Cole, Dee')?.value, 'From someone else')
   })
 
+  it('waits for saves before refreshing', async () => {
+    const api = fakeApi({ spreadsheetId: SHEET_ID })
+    renderApp(api)
+    await screen.findByText(/Tracking/)
+    const { promise: held, resolve: land } = Promise.withResolvers<undefined>()
+    const save = api.save
+    api.save = async (...args) => {
+      await held
+      return save(...args)
+    }
+    const load = api.load
+    let loads = 0
+    api.load = (...args) => {
+      loads++
+      return load(...args)
+    }
+    await pick('Bishop', 'Baker, Cal')
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+      await Promise.resolve()
+    })
+    assert.equal(loads, 0)
+    await act(async () => {
+      land(undefined)
+      await Promise.resolve()
+    })
+    await waitFor(() => {
+      assert.equal(loads, 1)
+    })
+    assert.deepEqual(picked('Bishop'), ['Baker, Cal'])
+  })
+
   it('syncs every calling on the page to the sheet', async () => {
     const api = fakeApi({ spreadsheetId: SHEET_ID, sheet: { 'Bishop|p1|0': { candidates: [{ id: 'm1', notes: 'Theirs' }] } } })
     renderApp(api)

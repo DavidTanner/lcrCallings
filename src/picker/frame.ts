@@ -1,4 +1,5 @@
 import { APP_NAME } from '../constants'
+import { message } from '../shared/errors'
 import { isPickMessage, pickPageUrl, type PickRequest, type PickResult } from '../shared/picker'
 
 /** How long pick.html gets to load and say it's ready, once there's a token */
@@ -20,8 +21,6 @@ export interface PickerFrameOptions {
   readyTimeoutMs?: number
   showTimeoutMs?: number
 }
-
-const message = (error: unknown) => error instanceof Error ? error.message : String(error)
 
 /**
  * The extension's page between LCR and the web page's pick.html (see

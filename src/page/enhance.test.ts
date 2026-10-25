@@ -17,6 +17,14 @@ describe('slugify', () => {
 describe('enhancePage', () => {
   let enhancement: Enhancement | undefined
   const enhance = () => (enhancement = enhancePage(document))
+  /** enhances the page and returns the rows its first pass reported */
+  const enhancedRows = () => {
+    let rows: CallingRow[] = []
+    enhancement = enhancePage(document, (r) => {
+      rows = r
+    })
+    return rows
+  }
 
   beforeEach(() => {
     document.body.innerHTML = orgTable('Bishopric', [
@@ -51,7 +59,7 @@ describe('enhancePage', () => {
   })
 
   it('reports each row, keyed by calling, holder and occurrence', () => {
-    const rows = enhance().rows()
+    const rows = enhancedRows()
     assert.deepEqual(rows.map(({ key, calling, member }) => ({ key, calling, member })), [
       { key: 'Bishop|p1|0', calling: 'Bishop', member: 'p1' },
       { key: 'Ward Clerk|vacant|0', calling: 'Ward Clerk', member: '' },
@@ -68,7 +76,7 @@ describe('enhancePage', () => {
       + orgTable('Priests Quorum', [{ calling: 'Priests Quorum Adviser' }])
       + orgTable('Priests Quorum Presidency', [{ calling: 'Priests Quorum First Assistant' }], 'h4')
       + orgTable('Teachers Quorum', [{ calling: 'Teachers Quorum President' }])
-    assert.deepEqual(enhance().rows().map(({ calling, organization, position }) => ({ calling, organization, position })), [
+    assert.deepEqual(enhancedRows().map(({ calling, organization, position }) => ({ calling, organization, position })), [
       { calling: 'Bishop', organization: ['Bishopric'], position: 0 },
       { calling: 'Priests Quorum Adviser', organization: ['Aaronic Priesthood Quorums', 'Priests Quorum'], position: 1 },
       { calling: 'Priests Quorum First Assistant', organization: ['Aaronic Priesthood Quorums', 'Priests Quorum', 'Priests Quorum Presidency'], position: 2 },
