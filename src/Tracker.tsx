@@ -2,10 +2,11 @@ import { Anchor, Button, Group, Text } from '@mantine/core'
 import mantineCss from '@mantine/core/styles.css'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { CandidatesField } from './CandidatesField'
+import { CandidatesField, candidateName, memberLabel } from './CandidatesField'
 import { HolderStatusField, type HolderStatusFieldProps, highlightColor, vacantHighlight } from './HolderStatusField'
 import { LAYER_ID } from './constants'
 import type { ExtensionApi } from './content/api'
+import { type CallingRule, callingName, optionsByCalling } from './lcr/callingRules'
 import type { Member } from './lcr/members'
 import { type CallingRow, enhancePage } from './page/enhance'
 import { shadowContainer } from './shadow'
@@ -13,7 +14,7 @@ import { ShareLinkButton } from './ShareLinkButton'
 import { type Candidate, type Consideration, consideration, type Tracking } from './shared/consideration'
 import { message } from './shared/errors'
 import { spreadsheetUrl } from './shared/spreadsheet'
-import { useConsiderations } from './useConsiderations'
+import { type CallingInfo, heldCallings, useConsiderations } from './useConsiderations'
 
 export { SAVE_DELAY_MS } from './useConsiderations'
 
@@ -62,6 +63,8 @@ export function Tracker({ doc, api, spreadsheetId, initial, webUrl, onChangeShee
   const [rows, setRows] = useState<CallingRow[]>([])
   const [members, setMembers] = useState<Member[]>()
   const [membersError, setMembersError] = useState<string>()
+  const [rules, setRules] = useState<Map<string, CallingRule>>()
+  const [rulesError, setRulesError] = useState<string>()
   const [refreshing, setRefreshing] = useState(false)
   const [syncing, setSyncing] = useState(false)
   /** what the last sync did */
@@ -69,7 +72,7 @@ export function Tracker({ doc, api, spreadsheetId, initial, webUrl, onChangeShee
   const [layer] = useState(() => createLayer(doc))
 
   const save = useCallback((consideration: Consideration) => api.save(spreadsheetId, consideration), [api, spreadsheetId])
-  const { values, change, changeHolderStatus, flush, settle, replace, saving, error, setError } = useConsiderations(initial, save)
+  const { values, change, changeHolderStatus, considerRelease, reconsiderRelease, flush, settle, replace, saving, error, setError } = useConsiderations(initial, save)
 
   useEffect(() => {
     const e = enhancePage(doc, (next) => {
@@ -111,9 +114,40 @@ export function Tracker({ doc, api, spreadsheetId, initial, webUrl, onChangeShee
     }
   }, [api, spreadsheetId, setError])
 
-  const options = useMemo(() => members?.map(m => ({ value: m.uuid, label: m.name })) ?? [], [members])
+  useEffect(() => {
+    let live = true
+    api.loadCallingRules?.().then(
+      async (loaded) => {
+        if (!live) return
+        setRules(loaded)
+        // so the web page, which can't reach LCR, can list only who can hold each calling
+        await api.saveCallingRules?.(spreadsheetId, loaded).catch((e: unknown) => {
+          if (live) setError(`Couldn't copy what callings require to the sheet: ${message(e)}`)
+        })
+      },
+      // without them everyone is listed, as before there were rules
+      (e: unknown) => {
+        if (live) setRulesError(message(e))
+      },
+    )
+    return () => {
+      live = false
+    }
+  }, [api, spreadsheetId, setError])
+
+  const options = useMemo(() => members?.map(m => ({ value: m.uuid, label: memberLabel(m) })) ?? [], [members])
+  /** calling name → the members who can hold it */
+  const byCalling = useMemo(() => optionsByCalling(rules, members ?? [], options), [rules, members, options])
   const names = useMemo(() => new Map(options.map(o => [o.value, o.label])), [options])
   const loading = !members && !membersError
+  const held = useMemo(() => heldCallings(rows), [rows])
+  /** someone picked for another calling may be released from the ones they hold */
+  const pick = useCallback((row: CallingInfo, id: string) => {
+    considerRelease(row, held.get(id))
+  }, [held, considerRelease])
+  const unpick = useCallback((row: CallingInfo, id: string) => {
+    reconsiderRelease(row, id, candidateName(id, names, false), held.get(id), q => doc.defaultView?.confirm(q) ?? true)
+  }, [held, names, reconsiderRelease, doc])
 
   const refresh = async () => {
     setRefreshing(true)
@@ -168,6 +202,7 @@ export function Tracker({ doc, api, spreadsheetId, initial, webUrl, onChangeShee
             </Text>
           )}
       {membersError && <Text size="sm" c="red">{membersError}</Text>}
+      {rulesError && <Text size="xs" c="orange">{`Listing every member for every calling: couldn't load what callings require. ${rulesError}`}</Text>}
       {error
         ? <Text size="sm" c="red">{error}</Text>
         : <Text size="xs" c="dimmed">{saving ? 'Saving…' : 'All changes saved'}</Text>}
@@ -182,12 +217,15 @@ export function Tracker({ doc, api, spreadsheetId, initial, webUrl, onChangeShee
         <CandidatesField
           row={row}
           candidates={values[row.key]?.candidates ?? NO_CANDIDATES}
-          options={options}
+          options={byCalling.get(callingName(row.calling)) ?? options}
           names={names}
           loading={loading}
+          held={held}
           membersError={membersError}
           dropdownTarget={layer.target}
           onChange={change}
+          onPick={pick}
+          onUnpick={unpick}
           onDone={flush}
         />,
         lightContainer(row.slot),

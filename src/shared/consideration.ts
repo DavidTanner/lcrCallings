@@ -79,16 +79,19 @@ export interface Consideration extends Tracking {
   organization?: string[]
   /** Where the row is on the Organizations page, from 0; left out when not known */
   position?: number
+  /** When whoever holds the calling now was sustained, as YYYY-MM-DD; left out when not known */
+  sustained?: string
 }
 
 /** Just the fields of a consideration, for when `calling` may be a page row carrying more */
-export function consideration({ key, calling, member, organization, position }: Omit<Consideration, keyof Tracking>, { candidates, holderStatus }: Tracking): Consideration {
+export function consideration({ key, calling, member, organization, position, sustained }: Omit<Consideration, keyof Tracking>, { candidates, holderStatus }: Tracking): Consideration {
   return {
     key,
     calling,
     member,
     ...(organization ? { organization } : {}),
     ...(position === undefined ? {} : { position }),
+    ...(sustained ? { sustained } : {}),
     candidates,
     ...(holderStatus ? { holderStatus } : {}),
   }

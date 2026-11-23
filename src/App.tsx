@@ -16,6 +16,8 @@ export interface AppProps {
   onClose: () => void
   /** where the web page is, to share links to it; no link without it */
   webUrl?: string
+  /** heads the panel; APP_NAME when left out */
+  title?: string
 }
 
 type State
@@ -27,7 +29,7 @@ type State
     /** `opened` once the web page is open to choose the sheet in; `error` if Google's picker failed */
     | { step: 'needsAccess', spreadsheetId: string, opened: boolean, error?: string }
 
-export function App({ doc, api, onClose, webUrl }: AppProps) {
+export function App({ doc, api, onClose, webUrl, title = APP_NAME }: AppProps) {
   const [state, setState] = useState<State>({ step: 'starting' })
 
   const connect = useCallback(async (spreadsheetId: string) => {
@@ -162,7 +164,7 @@ export function App({ doc, api, onClose, webUrl }: AppProps) {
     <Paper shadow="lg" radius="md" p="md" withBorder w={340}>
       <Stack gap="sm">
         <Group justify="space-between" wrap="nowrap">
-          <Title order={4}>{APP_NAME}</Title>
+          <Title order={4}>{title}</Title>
           <ActionIcon variant="subtle" color="gray" aria-label="Close" onClick={onClose}>
             ×
           </ActionIcon>

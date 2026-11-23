@@ -1,3 +1,4 @@
+import type { CallingRule } from '../lcr/callingRules'
 import { type Candidate, type Consideration, type HolderStatus, isHolderStatus, isStatus, type Tracking, tracking } from '../shared/consideration'
 
 /** Title of the tab the extension keeps its rows in */
@@ -9,10 +10,11 @@ export const SHEET_TITLE = 'Considering'
  * existed only have Considering, as free text. Organization and Position say
  * where the calling is on the Organizations page, so it can be shown the same
  * way away from it. Holder status is where whoever holds the calling now is,
- * e.g. being considered for release.
+ * e.g. being considered for release. Sustained is when they were, as YYYY-MM-DD.
  */
-export const HEADER = ['Key', 'Calling', 'Held by', 'Considering', 'Updated', 'Notes', 'Data', 'Status', 'Organization', 'Position', 'Holder status']
-const LAST_COLUMN = 'K'
+export const HEADER = ['Key', 'Calling', 'Held by', 'Considering', 'Updated', 'Notes', 'Data', 'Status', 'Organization', 'Position', 'Holder status', 'Sustained']
+const LAST_COLUMN = 'L'
+const SUSTAINED_COLUMN = 'L'
 /** Organization and Position */
 const PLACEMENT_COLUMNS = ['I', 'J'] as const
 
@@ -24,12 +26,59 @@ export const ORGANIZATION_SEPARATOR = ' > '
  * away from LCR, which can't read its member list, can show and pick names
  */
 export const MEMBERS_TITLE = 'Members'
-export const MEMBERS_HEADER = ['Id', 'Name']
+export const MEMBERS_HEADER = ['Id', 'Name', 'Sex', 'Age', 'Organizations', 'Baptized']
 
-/** Someone in the unit, as the Members tab keeps them */
+/** Someone in the unit, as the Members tab keeps them: what's needed to show them and check them against the Rules tab */
 export interface SheetMember {
   uuid: string
   name: string
+  sex?: 'M' | 'F'
+  age?: number
+  /** uuids of the organizations they belong to */
+  organizations?: string[]
+  /** baptized and confirmed */
+  baptized?: boolean
+}
+
+const yesNo = (value?: boolean) => value === undefined ? '' : value ? 'Yes' : 'No'
+const list = (cell = '') => cell.split('\n').map(s => s.trim()).filter(Boolean)
+
+/** A member's row in the Members tab */
+export const memberRow = (m: SheetMember) =>
+  [m.uuid, m.name, m.sex ?? '', m.age === undefined ? '' : String(m.age), m.organizations?.join('\n') ?? '', yesNo(m.baptized)]
+
+function memberIn([uuid, name, sex, age, organizations, baptized]: string[]): SheetMember[] {
+  if (!uuid || !name) return []
+  return [{
+    uuid,
+    name,
+    ...(sex === 'M' || sex === 'F' ? { sex } : {}),
+    ...(age && /^\d+$/.test(age) ? { age: Number(age) } : {}),
+    ...(organizations === undefined ? {} : { organizations: list(organizations) }),
+    ...(baptized === 'Yes' || baptized === 'No' ? { baptized: baptized === 'Yes' } : {}),
+  }]
+}
+
+/**
+ * Title of the tab the extension copies what each calling requires into,
+ * from LCR's Organizations page, so pages away from LCR list only members who can hold it
+ */
+export const RULES_TITLE = 'Rules'
+export const RULES_HEADER = ['Calling', 'Sex', 'Minimum age', 'Members only', 'Organizations']
+
+/** A calling's row in the Rules tab */
+export const ruleRow = ([calling, r]: [string, CallingRule]) =>
+  [calling, r.sex ?? '', r.minimumAge === undefined ? '' : String(r.minimumAge), r.membersOnly ? 'Yes' : '', r.organizations?.join('\n') ?? '']
+
+function ruleIn([calling, sex, minimumAge, membersOnly, organizations]: string[]): [string, CallingRule][] {
+  if (!calling) return []
+  const orgs = list(organizations)
+  return [[calling, {
+    ...(sex === 'M' || sex === 'F' ? { sex } : {}),
+    ...(minimumAge && /^\d+$/.test(minimumAge) ? { minimumAge: Number(minimumAge) } : {}),
+    ...(membersOnly === 'Yes' ? { membersOnly: true } : {}),
+    ...(orgs.length ? { organizations: orgs } : {}),
+  }]]
 }
 
 const API = 'https://sheets.googleapis.com/v4/spreadsheets'
@@ -92,6 +141,7 @@ export function createSheetsClient(tokens: TokenProvider, fetchFn: (url: string,
       candidates.filter(c => c.status).map(c => `${c.id}: ${c.status ?? ''}`).join('\n'),
       ...placement(consideration),
       holderStatus ?? '',
+      consideration.sustained ?? '',
     ]
   }
   const append = (id: string, considerations: Consideration[], updated = new Date().toISOString()) =>
@@ -101,6 +151,24 @@ export function createSheetsClient(tokens: TokenProvider, fetchFn: (url: string,
     })
   const writeHeader = (id: string) =>
     request(`${range(id, 'A1')}?valueInputOption=RAW`, { method: 'PUT', body: JSON.stringify({ values: [HEADER] }) })
+
+  /** A tab's rows below its header, from A to `last`; none if there's no such tab */
+  async function readTab(id: string, title: string, last: string): Promise<string[][]> {
+    if (!(await tabs(id)).includes(title)) return []
+    const { values = [] } = await request<{ values?: string[][] }>(range(id, `A2:${last}`, title))
+    return values
+  }
+
+  /**
+   * Replaces a tab with `values`, from A to `last`, adding it if needed. Rows
+   * are written over the old ones before any left over are cleared, so
+   * someone reading it meanwhile never sees it empty.
+   */
+  async function replaceTab(id: string, title: string, last: string, values: string[][]): Promise<void> {
+    if (!(await tabs(id)).includes(title)) await addTab(id, title)
+    await request(`${range(id, `A1:${last}${String(values.length)}`, title)}?valueInputOption=RAW`, { method: 'PUT', body: JSON.stringify({ values }) })
+    await request(`${range(id, `A${String(values.length + 1)}:${last}`, title)}:clear`, { method: 'POST', body: '{}' })
+  }
 
   async function tabs(id: string) {
     const { sheets = [] } = await request<{ sheets?: { properties: { title: string } }[] }>(
@@ -158,22 +226,19 @@ export function createSheetsClient(tokens: TokenProvider, fetchFn: (url: string,
 
     /** The members the extension copied into the Members tab; none if it hasn't yet */
     async loadMembers(id: string): Promise<SheetMember[]> {
-      if (!(await tabs(id)).includes(MEMBERS_TITLE)) return []
-      const { values = [] } = await request<{ values?: string[][] }>(range(id, 'A2:B', MEMBERS_TITLE))
-      return values.flatMap(([uuid, name]) => uuid && name ? [{ uuid, name }] : [])
+      return (await readTab(id, MEMBERS_TITLE, 'F')).flatMap(memberIn)
     },
 
-    /**
-     * Replaces the Members tab with `members`, adding it if needed. Rows are
-     * written over the old ones before any left over are cleared, so someone
-     * reading it meanwhile never sees it empty.
-     */
-    async saveMembers(id: string, members: SheetMember[]): Promise<void> {
-      if (!(await tabs(id)).includes(MEMBERS_TITLE)) await addTab(id, MEMBERS_TITLE)
-      const values = [MEMBERS_HEADER, ...members.map(m => [m.uuid, m.name])]
-      await request(`${range(id, `A1:B${String(values.length)}`, MEMBERS_TITLE)}?valueInputOption=RAW`, { method: 'PUT', body: JSON.stringify({ values }) })
-      await request(`${range(id, `A${String(values.length + 1)}:B`, MEMBERS_TITLE)}:clear`, { method: 'POST', body: '{}' })
+    /** Replaces the Members tab with `members`, adding it if needed */
+    saveMembers: (id: string, members: SheetMember[]) => replaceTab(id, MEMBERS_TITLE, 'F', [MEMBERS_HEADER, ...members.map(memberRow)]),
+
+    /** What each calling requires, by name, as the extension copied it into the Rules tab; none if it hasn't yet */
+    async loadRules(id: string): Promise<Map<string, CallingRule>> {
+      return new Map((await readTab(id, RULES_TITLE, 'E')).flatMap(ruleIn))
     },
+
+    /** Replaces the Rules tab with `rules`, by calling name, adding it if needed */
+    saveRules: (id: string, rules: [string, CallingRule][]) => replaceTab(id, RULES_TITLE, 'E', [RULES_HEADER, ...rules.map(ruleRow)]),
 
     /**
      * Updates the row for this key (the one `rowsByKey` picks), or appends one. Refuses to update a row
@@ -221,11 +286,14 @@ export function createSheetsClient(tokens: TokenProvider, fetchFn: (url: string,
           missing.push(c)
           continue
         }
-        const [, , , , , , , , organization = '', position = ''] = values[index] ?? []
+        const [, , , , , , , , organization = '', position = '', , sustained = ''] = values[index] ?? []
         const cells = placement(c)
+        const n = String(index + 1)
         if (c.organization && cells.map(String).join('\t') !== [organization, position].join('\t')) {
-          const n = String(index + 1)
           moved.push({ range: `'${SHEET_TITLE}'!${PLACEMENT_COLUMNS[0]}${n}:${PLACEMENT_COLUMNS[1]}${n}`, values: [cells] })
+        }
+        if (c.sustained && c.sustained !== sustained) {
+          moved.push({ range: `'${SHEET_TITLE}'!${SUSTAINED_COLUMN}${n}`, values: [[c.sustained]] })
         }
       }
       if (moved.length) {
@@ -262,12 +330,13 @@ function placement({ organization, position }: Pick<Consideration, 'organization
 }
 
 /** Where a row says its calling is on the Organizations page, leaving out what it doesn't say */
-export function placementIn([, , , , , , , , organization = '', position = '']: string[]): Pick<Consideration, 'organization' | 'position'> {
+export function placementIn([, , , , , , , , organization = '', position = '', , sustained = '']: string[]): Pick<Consideration, 'organization' | 'position' | 'sustained'> {
   const headings = organization.split(ORGANIZATION_SEPARATOR).map(h => h.trim()).filter(Boolean)
   const at = position.trim() ? Number(position) : NaN
   return {
     ...(headings.length ? { organization: headings } : {}),
     ...(Number.isInteger(at) && at >= 0 ? { position: at } : {}),
+    ...(/^\d{4}-\d{2}-\d{2}$/.test(sustained) ? { sustained } : {}),
   }
 }
 

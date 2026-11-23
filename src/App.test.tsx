@@ -84,6 +84,30 @@ describe('App', () => {
     assert.deepEqual(picked('Ward Clerk'), ['Brother Jones', 'moved-out'])
   })
 
+  it('lists only members who can hold the calling, keeping anyone already picked, and copies the rules to the sheet', async () => {
+    const [bea, cal, dee] = MEMBERS.map((m, i) => ({ ...m, sex: i === 1 ? 'M' as const : 'F' as const }))
+    const api = fakeApi({ spreadsheetId: SHEET_ID, members: [bea, cal, dee].filter(m => m !== undefined), sheet: { 'Bishop|p1|0': { candidates: [{ id: 'm3', notes: '' }] } } })
+    const rules = new Map([['Bishop', { sex: 'M' as const }]])
+    api.loadCallingRules = () => Promise.resolve(rules)
+    const copied: unknown[] = []
+    api.saveCallingRules = (id, saved) => {
+      copied.push([id, saved])
+      return Promise.resolve()
+    }
+    renderApp(api)
+    await screen.findByText(/Tracking/)
+    assert.deepEqual(picked('Bishop'), ['Cole, Dee (F)'])
+
+    const field = input('Bishop')
+    const container = cell('Bishop')
+    assert.ok(field && container)
+    fireEvent.click(field)
+    await waitFor(() => {
+      assert.deepEqual(within(container).queryAllByRole('option').map(o => o.textContent), ['Baker, Cal (M)'])
+    })
+    assert.deepEqual(copied, [[SHEET_ID, rules]])
+  })
+
   it('tells apart members with the same name', async () => {
     const members = [...MEMBERS, { uuid: 'm4', name: 'Abel, Bea', nameSort: 'ABEL, BEA' }]
     const api = fakeApi({ spreadsheetId: SHEET_ID, members, sheet: { 'Bishop|p1|0': { candidates: [{ id: 'm4', notes: 'The younger one' }] } } })
@@ -102,7 +126,7 @@ describe('App', () => {
       fireEvent.click(options[1] as HTMLElement)
       await Promise.resolve()
     })
-    assert.deepEqual(api.saved.at(-1), { key: 'Ward Clerk|vacant|0', calling: 'Ward Clerk', member: '', organization: ['Bishopric'], position: 1, candidates: [{ id: 'm4', notes: '' }] })
+    assert.deepEqual(api.saved.at(-1), { key: 'Ward Clerk|vacant|0', calling: 'Ward Clerk', member: '', organization: ['Bishopric'], position: 1, sustained: '2026-01-01', candidates: [{ id: 'm4', notes: '' }] })
   })
 
   it('saves candidates picked from the member list', async () => {
@@ -110,7 +134,7 @@ describe('App', () => {
     renderApp(api)
     await screen.findByText(/Tracking/)
     await pick('Bishop', 'Baker, Cal')
-    assert.deepEqual(api.saved, [{ key: 'Bishop|p1|0', calling: 'Bishop', member: 'p1', organization: ['Bishopric'], position: 0, candidates: [{ id: 'm2', notes: '' }] }])
+    assert.deepEqual(api.saved, [{ key: 'Bishop|p1|0', calling: 'Bishop', member: 'p1', organization: ['Bishopric'], position: 0, sustained: '2026-01-01', candidates: [{ id: 'm2', notes: '' }] }])
     assert.deepEqual(picked('Bishop'), ['Baker, Cal'])
     assert.ok(notes('Bishop', 'Baker, Cal'))
     assert.ok(screen.getByText('All changes saved'))
@@ -196,7 +220,7 @@ describe('App', () => {
       fireEvent.click(await within(container).findByRole('option', { name: 'Considering Release' }))
       await Promise.resolve()
     })
-    assert.deepEqual(api.saved.at(-1), { key: 'Bishop|p1|0', calling: 'Bishop', member: 'p1', organization: ['Bishopric'], position: 0, candidates: [{ id: 'm1', notes: 'Ask' }], holderStatus: 'Considering Release' })
+    assert.deepEqual(api.saved.at(-1), { key: 'Bishop|p1|0', calling: 'Bishop', member: 'p1', organization: ['Bishopric'], position: 0, sustained: '2026-01-01', candidates: [{ id: 'm1', notes: 'Ask' }], holderStatus: 'Considering Release' })
     assert.notEqual(nameCell.style.backgroundColor, '')
 
     const clear = container.querySelector<HTMLButtonElement>('.mantine-InputClearButton-root')
@@ -288,7 +312,7 @@ describe('App', () => {
       await Promise.resolve()
     })
     assert.ok(await screen.findByText('Added 1 calling to the sheet.'))
-    assert.deepEqual(api.synced, [{ key: 'Ward Clerk|vacant|0', calling: 'Ward Clerk', member: '', organization: ['Bishopric'], position: 1, candidates: [] }])
+    assert.deepEqual(api.synced, [{ key: 'Ward Clerk|vacant|0', calling: 'Ward Clerk', member: '', organization: ['Bishopric'], position: 1, sustained: '2026-01-01', candidates: [] }])
     assert.deepEqual(api.sheet['Bishop|p1|0'], { candidates: [{ id: 'm1', notes: 'Theirs' }] })
 
     await act(async () => {

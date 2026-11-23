@@ -1,15 +1,17 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { candidatesIn, createSheetsClient, HEADER, MEMBERS_TITLE, placementIn, SHEET_TITLE, type TokenProvider, trackingIn } from './sheets'
+import type { CallingRule } from '../lcr/callingRules'
+import { candidatesIn, createSheetsClient, HEADER, MEMBERS_TITLE, placementIn, RULES_TITLE, SHEET_TITLE, type TokenProvider, trackingIn } from './sheets'
 
 const ID = 'sheet1'
 const RANGE = encodeURIComponent(`'${SHEET_TITLE}'!`)
 const MEMBERS_RANGE = encodeURIComponent(`'${MEMBERS_TITLE}'!`)
+const RULES_RANGE = encodeURIComponent(`'${RULES_TITLE}'!`)
 
 interface Call { method: string, url: string, body?: unknown }
 
 /** A fetch that answers from a pretend spreadsheet and records every call */
-function fakeGoogle({ tabs = [SHEET_TITLE], rows = [HEADER] as string[][], members = [] as string[][], status }: { tabs?: string[], rows?: string[][], members?: string[][], status?: number[] } = {}) {
+function fakeGoogle({ tabs = [SHEET_TITLE], rows = [HEADER] as string[][], members = [] as string[][], rules = [] as string[][], status }: { tabs?: string[], rows?: string[][], members?: string[][], rules?: string[][], status?: number[] } = {}) {
   const calls: Call[] = []
   const fetchFn = (input: string, init: RequestInit = {}) => {
     const url = input.replace('https://sheets.googleapis.com/v4/spreadsheets/', '')
@@ -20,10 +22,11 @@ function fakeGoogle({ tabs = [SHEET_TITLE], rows = [HEADER] as string[][], membe
     if (forced) return reply({ error: { message: `status ${String(forced)}` } }, forced)
     if (url.endsWith('?fields=sheets.properties.title')) return reply({ sheets: tabs.map(title => ({ properties: { title } })) })
     if (url.includes(`${RANGE}A%3AE`)) return reply({ values: rows.map(row => row.slice(0, 5)) })
-    if (url.includes(`${RANGE}A1%3AK1`)) return reply({ values: rows.slice(0, 1) })
-    if (url.includes(`${RANGE}A2%3AK`)) return reply({ values: rows.slice(1) })
-    if (method === 'GET' && url.endsWith(`${RANGE}A%3AK`)) return reply({ values: rows })
-    if (url.endsWith(`${MEMBERS_RANGE}A2%3AB`)) return reply({ values: members })
+    if (url.includes(`${RANGE}A1%3AL1`)) return reply({ values: rows.slice(0, 1) })
+    if (url.includes(`${RANGE}A2%3AL`)) return reply({ values: rows.slice(1) })
+    if (method === 'GET' && url.endsWith(`${RANGE}A%3AL`)) return reply({ values: rows })
+    if (url.endsWith(`${MEMBERS_RANGE}A2%3AF`)) return reply({ values: members })
+    if (url.endsWith(`${RULES_RANGE}A2%3AE`)) return reply({ values: rules })
     return reply({})
   }
   return { calls, fetchFn: fetchFn }
@@ -114,7 +117,7 @@ describe('createSheetsClient', () => {
     await createSheetsClient(tokens(), google.fetchFn).save(ID, consideration)
     const write = google.calls.at(-1)
     assert.equal(write?.method, 'PUT')
-    assert.match(write.url, new RegExp(`^${ID}/values/${RANGE}A3%3AK3\\?valueInputOption=RAW$`))
+    assert.match(write.url, new RegExp(`^${ID}/values/${RANGE}A3%3AL3\\?valueInputOption=RAW$`))
     const [key, calling, member, considering, , notes, data, status, organization, position, holderStatus] = (write.body as { values: string[][] }).values[0] ?? []
     assert.deepEqual([key, calling, member, considering, notes, status, organization, position, holderStatus], ['Bishop|p1|0', 'Bishop', 'p1', 'm1\nm2', 'm1: Available after June', 'm2: Pray about', 'Bishopric', 0, 'Considering Release'])
     assert.deepEqual(JSON.parse(data ?? ''), consideration.candidates)
@@ -125,7 +128,7 @@ describe('createSheetsClient', () => {
     const updated = await createSheetsClient(tokens(), google.fetchFn).save(ID, consideration)
     const write = google.calls.at(-1)
     assert.equal(write?.method, 'POST')
-    assert.match(write.url, /A%3AK:append\?valueInputOption=RAW&insertDataOption=INSERT_ROWS$/)
+    assert.match(write.url, /A%3AL:append\?valueInputOption=RAW&insertDataOption=INSERT_ROWS$/)
     assert.equal((write.body as { values: string[][] }).values[0]?.[4], updated)
   })
 
@@ -155,7 +158,7 @@ describe('createSheetsClient', () => {
     assert.equal(added, 1)
     const writes = google.calls.filter(c => c.method !== 'GET')
     assert.equal(writes.length, 1)
-    assert.match(writes[0]?.url ?? '', /A%3AK:append\?valueInputOption=RAW&insertDataOption=INSERT_ROWS$/)
+    assert.match(writes[0]?.url ?? '', /A%3AL:append\?valueInputOption=RAW&insertDataOption=INSERT_ROWS$/)
     const [[key, calling, member, considering, updated, notes, data, status, organization, position, holderStatus] = []] = (writes[0]?.body as { values: string[][] }).values
     assert.deepEqual([key, calling, member, considering, updated, notes, data, status, organization, position, holderStatus], ['Ward Clerk|vacant|0', 'Ward Clerk', '', '', '', '', '', '', '', '', ''])
   })
@@ -171,7 +174,7 @@ describe('createSheetsClient', () => {
     await client.save(ID, { ...consideration, updated: 'stamp1' })
     const write = google.calls.at(-1)
     assert.equal(write?.method, 'PUT')
-    assert.match(write.url, new RegExp(`^${ID}/values/${RANGE}A2%3AK2\\?valueInputOption=RAW$`))
+    assert.match(write.url, new RegExp(`^${ID}/values/${RANGE}A2%3AL2\\?valueInputOption=RAW$`))
   })
 
   it('writes nothing when every key is already in the sheet, where the page has it', async () => {
@@ -182,7 +185,7 @@ describe('createSheetsClient', () => {
 
   it('updates only where rows already in the sheet are on the page', async () => {
     const theirs = [consideration.key, 'Bishop', 'p1', 'm9', '', '', '[{"id":"m9","notes":""}]']
-    const eq = { key: 'EQ Teacher|vacant|0', calling: 'EQ Teacher', member: '', organization: ['Elders Quorum', 'Teachers'], position: 7, candidates: [] }
+    const eq = { key: 'EQ Teacher|vacant|0', calling: 'EQ Teacher', member: '', organization: ['Elders Quorum', 'Teachers'], position: 7, sustained: '2023-05-07', candidates: [] }
     const google = fakeGoogle({ rows: [HEADER, ['other'], theirs, [eq.key, '', '', '', '', '', '', '', 'Elders Quorum', '3']] })
     assert.equal(await createSheetsClient(tokens(), google.fetchFn).sync(ID, [consideration, eq]), 0)
     const writes = google.calls.filter(c => c.method !== 'GET')
@@ -193,6 +196,7 @@ describe('createSheetsClient', () => {
       data: [
         { range: `'${SHEET_TITLE}'!I3:J3`, values: [['Bishopric', 0]] },
         { range: `'${SHEET_TITLE}'!I4:J4`, values: [['Elders Quorum > Teachers', 7]] },
+        { range: `'${SHEET_TITLE}'!L4`, values: [['2023-05-07']] },
       ],
     })
   })
@@ -203,6 +207,8 @@ describe('createSheetsClient', () => {
     assert.deepEqual(placementIn(cells('', '')), {})
     assert.deepEqual(placementIn(cells(' Primary ', 'soon')), { organization: ['Primary'] })
     assert.deepEqual(placementIn(['k', 'Bishop']), {})
+    assert.deepEqual(placementIn([...cells('', ''), '', '2023-05-07']), { sustained: '2023-05-07' })
+    assert.deepEqual(placementIn([...cells('', ''), '', '7 May 2023']), {})
   })
 
   it('retries once with a fresh token when Google rejects one', async () => {
@@ -228,9 +234,13 @@ describe('createSheetsClient', () => {
   })
 
   it('loads members from the Members tab', async () => {
-    const google = fakeGoogle({ tabs: [SHEET_TITLE, MEMBERS_TITLE], members: [['m1', 'Abel, Bea'], ['m2'], ['m3', 'Cole, Dee']] })
+    const google = fakeGoogle({ tabs: [SHEET_TITLE, MEMBERS_TITLE], members: [['m1', 'Abel, Bea', 'F', '34', 'rs\nss', 'Yes'], ['m2'], ['m3', 'Cole, Dee'], ['m4', 'Dunn, Eve', '?', 'old', '', 'maybe']] })
     const members = await createSheetsClient(tokens(), google.fetchFn).loadMembers(ID)
-    assert.deepEqual(members, [{ uuid: 'm1', name: 'Abel, Bea' }, { uuid: 'm3', name: 'Cole, Dee' }])
+    assert.deepEqual(members, [
+      { uuid: 'm1', name: 'Abel, Bea', sex: 'F', age: 34, organizations: ['rs', 'ss'], baptized: true },
+      { uuid: 'm3', name: 'Cole, Dee' },
+      { uuid: 'm4', name: 'Dunn, Eve', organizations: [] },
+    ])
   })
 
   it('loads no members when there is no Members tab yet', async () => {
@@ -241,12 +251,33 @@ describe('createSheetsClient', () => {
 
   it('writes members over the old ones, then clears any left over', async () => {
     const google = fakeGoogle({ tabs: [SHEET_TITLE, MEMBERS_TITLE] })
-    await createSheetsClient(tokens(), google.fetchFn).saveMembers(ID, [{ uuid: 'm1', name: 'Abel, Bea' }, { uuid: 'm2', name: 'Baker, Cal' }])
+    await createSheetsClient(tokens(), google.fetchFn).saveMembers(ID, [{ uuid: 'm1', name: 'Abel, Bea', sex: 'F', age: 34, organizations: ['rs', 'ss'], baptized: true }, { uuid: 'm2', name: 'Baker, Cal' }])
     const [write, clear] = google.calls.filter(c => c.method !== 'GET')
     assert.equal(write?.method, 'PUT')
-    assert.match(write.url, new RegExp(`^${ID}/values/${MEMBERS_RANGE}A1%3AB3\\?valueInputOption=RAW$`))
-    assert.deepEqual(write.body, { values: [['Id', 'Name'], ['m1', 'Abel, Bea'], ['m2', 'Baker, Cal']] })
-    assert.match(clear?.url ?? '', new RegExp(`^${ID}/values/${MEMBERS_RANGE}A4%3AB:clear$`))
+    assert.match(write.url, new RegExp(`^${ID}/values/${MEMBERS_RANGE}A1%3AF3\\?valueInputOption=RAW$`))
+    assert.deepEqual(write.body, { values: [['Id', 'Name', 'Sex', 'Age', 'Organizations', 'Baptized'], ['m1', 'Abel, Bea', 'F', '34', 'rs\nss', 'Yes'], ['m2', 'Baker, Cal', '', '', '', '']] })
+    assert.match(clear?.url ?? '', new RegExp(`^${ID}/values/${MEMBERS_RANGE}A4%3AF:clear$`))
+  })
+
+  it('reads and writes what callings require in the Rules tab', async () => {
+    const rule: CallingRule = { sex: 'M', minimumAge: 18, membersOnly: true, organizations: ['eq', 'eq-teachers'] }
+    const google = fakeGoogle({ tabs: [SHEET_TITLE, RULES_TITLE], rules: [['Elders Quorum Teacher', 'M', '18', 'Yes', 'eq\neq-teachers'], ['Primary Teacher', '', '11', '', ''], ['']] })
+    const client = createSheetsClient(tokens(), google.fetchFn)
+    assert.deepEqual(await client.loadRules(ID), new Map([['Elders Quorum Teacher', rule], ['Primary Teacher', { minimumAge: 11 }]]))
+
+    await client.saveRules(ID, [['Elders Quorum Teacher', rule], ['Primary Teacher', { minimumAge: 11 }]])
+    const [write, clear] = google.calls.filter(c => c.method !== 'GET')
+    assert.match(write?.url ?? '', new RegExp(`^${ID}/values/${RULES_RANGE}A1%3AE3\\?valueInputOption=RAW$`))
+    assert.deepEqual(write?.body, { values: [
+      ['Calling', 'Sex', 'Minimum age', 'Members only', 'Organizations'],
+      ['Elders Quorum Teacher', 'M', '18', 'Yes', 'eq\neq-teachers'],
+      ['Primary Teacher', '', '11', '', ''],
+    ] })
+    assert.match(clear?.url ?? '', new RegExp(`^${ID}/values/${RULES_RANGE}A4%3AE:clear$`))
+  })
+
+  it('loads no rules when there is no Rules tab yet', async () => {
+    assert.deepEqual(await createSheetsClient(tokens(), fakeGoogle().fetchFn).loadRules(ID), new Map())
   })
 
   it('adds the Members tab when it is missing', async () => {

@@ -42,7 +42,7 @@ describe('fetchMemberList', () => {
     const lcr = fakeLcr(() => new Response(payload, { headers: { 'content-type': 'text/x-component' } }))
     await fetchMemberList(ORIGIN, lcr.fetchFn)
     assert.deepEqual(lcr.calls, [{
-      url: `${ORIGIN}${MEMBER_LIST_PATH}?lang=eng`,
+      url: `${ORIGIN}${MEMBER_LIST_PATH}?lang=eng&_rsc`,
       init: { headers: { RSC: '1' }, redirect: 'manual' },
     }])
   })
@@ -118,7 +118,7 @@ describe('fetchMemberList, when the page loads members with a Server Action', ()
     const lcr = actionLcr(reference(ACTION_ID, 'getMemberList'))
     const members = await fetchMemberList(ORIGIN, lcr.fetchFn, 'spa')
     assert.deepEqual(members.map(m => m.uuid), ['u1', 'u2'])
-    assert.deepEqual(lcr.calls.map(c => c.url), [`${ORIGIN}${MEMBER_LIST_PATH}?lang=spa`, `${ORIGIN}${CHUNK}`, `${ORIGIN}${MEMBER_LIST_PATH}?lang=spa`])
+    assert.deepEqual(lcr.calls.map(c => c.url), [`${ORIGIN}${MEMBER_LIST_PATH}?lang=spa&_rsc`, `${ORIGIN}${CHUNK}`, `${ORIGIN}${MEMBER_LIST_PATH}?lang=spa`])
     assert.deepEqual(lcr.calls[2]?.init, {
       method: 'POST',
       headers: { 'Accept': 'text/x-component', 'Content-Type': 'text/plain;charset=UTF-8', 'Next-Action': ACTION_ID },

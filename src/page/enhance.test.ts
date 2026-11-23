@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { afterEach, beforeEach, describe, it } from 'node:test'
 import { orgRow, orgTable } from '../../test/fixtures'
-import { type CallingRow, type Enhancement, enhancePage, SLOT, slugify } from './enhance'
+import { type CallingRow, type Enhancement, enhancePage, isoDate, SLOT, slugify } from './enhance'
 
 const labels = (row: Element) => [...row.children].map(cell =>
   cell.querySelector('.eden-table-card-view__cloned-column-header')?.textContent)
@@ -11,6 +11,14 @@ describe('slugify', () => {
   it('makes class-safe names', () => {
     assert.equal(slugify('Ward Assistant Clerk--Membership'), 'ward-assistant-clerk-membership')
     assert.equal(slugify('Course 15, Course 16'), 'course-15-course-16')
+  })
+})
+
+describe('isoDate', () => {
+  it('reads a date as the page shows it', () => {
+    assert.equal(isoDate('7 Jan 2024'), '2024-01-07')
+    assert.equal(isoDate(''), undefined)
+    assert.equal(isoDate('soon'), undefined)
   })
 })
 

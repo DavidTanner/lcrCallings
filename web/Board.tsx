@@ -1,18 +1,19 @@
 import { Alert, Anchor, Badge, Button, Group, Mark, Paper, SegmentedControl, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core'
 import { useCallback, useMemo, useState } from 'react'
 import type { SheetMember, SheetsClient } from '../src/background/sheets'
-import { CandidatesField, candidateName } from '../src/CandidatesField'
+import { CandidatesField, candidateName, memberLabel } from '../src/CandidatesField'
+import { type CallingRule, callingName, optionsByCalling } from '../src/lcr/callingRules'
 import { HolderStatusField, VACANT_COLOR } from '../src/HolderStatusField'
 import { ShareLinkButton } from '../src/ShareLinkButton'
 import { type Candidate, type Consideration, HOLDER_STATUS_COLORS, tracking } from '../src/shared/consideration'
 import { message } from '../src/shared/errors'
 import { spreadsheetUrl } from '../src/shared/spreadsheet'
-import { type CallingInfo, useConsiderations } from '../src/useConsiderations'
+import { type CallingInfo, heldCallings, useConsiderations } from '../src/useConsiderations'
 import { OrganizationPicker } from './OrganizationPicker'
 import { byOrganization, UNGROUPED } from './organizations'
 
 /** What the page needs from Google Sheets, so it can be tested without Google */
-export type WebApi = Pick<SheetsClient, 'loadRows' | 'loadMembers' | 'save'>
+export type WebApi = Pick<SheetsClient, 'loadRows' | 'loadMembers' | 'loadRules' | 'save'>
 
 const NO_CANDIDATES: Candidate[] = []
 
@@ -23,6 +24,8 @@ export interface BoardProps {
   spreadsheetId: string
   rows: Consideration[]
   members: SheetMember[]
+  /** what each calling requires, by name, to list only members who can hold it */
+  rules: Map<string, CallingRule>
   /** this page's address, to share links to it */
   pageUrl: string
   /** Makes sure there's a Google token, signing in if needed; call it from a tap */
@@ -30,9 +33,10 @@ export interface BoardProps {
 }
 
 /** Every calling in the sheet, with who is being considered for each, saving edits to the sheet */
-export function Board({ api, spreadsheetId, rows: initialRows, members: initialMembers, pageUrl, ensureSignedIn }: BoardProps) {
+export function Board({ api, spreadsheetId, rows: initialRows, members: initialMembers, rules: initialRules, pageUrl, ensureSignedIn }: BoardProps) {
   const [callings, setCallings] = useState<CallingInfo[]>(initialRows)
   const [members, setMembers] = useState(initialMembers)
+  const [rules, setRules] = useState(initialRules)
   const [search, setSearch] = useState('')
   const [show, setShow] = useState<Show>('all')
   /** organizations taken out of view; any not in it, including new ones, are shown */
@@ -41,10 +45,20 @@ export function Board({ api, spreadsheetId, rows: initialRows, members: initialM
 
   const initial = useMemo(() => Object.fromEntries(initialRows.map(r => [r.key, tracking(r)])), [initialRows])
   const save = useCallback((consideration: Consideration) => api.save(spreadsheetId, consideration), [api, spreadsheetId])
-  const { values, change, changeHolderStatus, flush, settle, retry, replace, saving, unsaved, error, setError } = useConsiderations(initial, save)
+  const { values, change, changeHolderStatus, considerRelease, reconsiderRelease, flush, settle, retry, replace, saving, unsaved, error, setError } = useConsiderations(initial, save)
 
-  const options = useMemo(() => members.map(m => ({ value: m.uuid, label: m.name })), [members])
+  const options = useMemo(() => members.map(m => ({ value: m.uuid, label: memberLabel(m) })), [members])
+  /** calling name → the members who can hold it */
+  const byCalling = useMemo(() => optionsByCalling(rules, members, options), [rules, members, options])
   const names = useMemo(() => new Map(options.map(o => [o.value, o.label])), [options])
+  const held = useMemo(() => heldCallings(callings), [callings])
+  /** someone picked for another calling may be released from the ones they hold */
+  const pick = useCallback((row: CallingInfo, id: string) => {
+    considerRelease(row, held.get(id))
+  }, [held, considerRelease])
+  const unpick = useCallback((row: CallingInfo, id: string) => {
+    reconsiderRelease(row, id, candidateName(id, names, false), held.get(id), q => window.confirm(q))
+  }, [held, names, reconsiderRelease])
 
   const refresh = async () => {
     setRefreshing(true)
@@ -52,9 +66,10 @@ export function Board({ api, spreadsheetId, rows: initialRows, members: initialM
       await ensureSignedIn()
       // let saves land first, or the load shows the sheet without them
       await settle()
-      const [rows, fresh] = await Promise.all([api.loadRows(spreadsheetId), api.loadMembers(spreadsheetId)])
+      const [rows, fresh, freshRules] = await Promise.all([api.loadRows(spreadsheetId), api.loadMembers(spreadsheetId), api.loadRules(spreadsheetId)])
       setCallings(rows)
       setMembers(fresh)
+      setRules(freshRules)
       replace(Object.fromEntries(rows.map(r => [r.key, tracking(r)])))
       setError(undefined)
     }
@@ -200,10 +215,13 @@ export function Board({ api, spreadsheetId, rows: initialRows, members: initialM
                         <CandidatesField
                           row={row}
                           candidates={values[row.key]?.candidates ?? NO_CANDIDATES}
-                          options={options}
+                          options={byCalling.get(callingName(row.calling)) ?? options}
                           names={names}
                           loading={false}
+                          held={held}
                           onChange={change}
+                          onPick={pick}
+                          onUnpick={unpick}
                           onDone={flush}
                           size="md"
                         />

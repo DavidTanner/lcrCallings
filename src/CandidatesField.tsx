@@ -1,4 +1,4 @@
-import { type ComboboxItem, type MantineSize, MultiSelect, Select, Stack, Textarea } from '@mantine/core'
+import { type ComboboxItem, type MantineSize, MultiSelect, Select, Stack, Text, Textarea } from '@mantine/core'
 import { memo, useMemo } from 'react'
 import { COLUMN_TITLE } from './page/enhance'
 import { type Candidate, isStatus, STATUSES } from './shared/consideration'
@@ -19,19 +19,39 @@ export function candidateName(id: string, names: Map<string, string>, loading: b
   return loading ? 'Loading…' : id
 }
 
+/** Whole years since `sustained` (YYYY-MM-DD), e.g. "2 yrs" */
+export function tenure(sustained: string, today = new Date()) {
+  const [year = 0, month = 0, day = 0] = sustained.split('-').map(Number)
+  const beforeAnniversary = today.getMonth() + 1 < month || (today.getMonth() + 1 === month && today.getDate() < day)
+  const years = Math.max(0, today.getFullYear() - year - (beforeAnniversary ? 1 : 0))
+  return years ? `${String(years)} yr${years === 1 ? '' : 's'}` : 'under 1 yr'
+}
+
+/** How a member is named in the dropdowns: "Abel, Bea (F, 34)" */
+export function memberLabel({ name, sex, age }: { name: string, sex?: string, age?: number }) {
+  const details = [sex, age].filter(d => d !== undefined).join(', ')
+  return details ? `${name} (${details})` : name
+}
+
 export interface CandidatesFieldProps {
   row: CallingInfo
   candidates: Candidate[]
-  /** the members who can be picked */
+  /** the members who can be picked for this calling */
   options: ComboboxItem[]
   /** member uuid → name */
   names: Map<string, string>
   loading: boolean
+  /** member uuid → the callings they hold now */
+  held: Map<string, CallingInfo[]>
   /** why the member list couldn't be loaded */
   membersError?: string
   /** where dropdowns render; Mantine's default when left out */
   dropdownTarget?: HTMLElement
   onChange: (row: CallingInfo, candidates: Candidate[], debounce: boolean) => void
+  /** called with each member newly picked */
+  onPick: (row: CallingInfo, id: string) => void
+  /** called with each member taken out */
+  onUnpick: (row: CallingInfo, id: string) => void
   /** called when the user leaves a notes field, to save it right away */
   onDone: (key: string) => void
   /** of the inputs; iPads zoom in on inputs with text smaller than md */
@@ -41,18 +61,21 @@ export interface CandidatesFieldProps {
 const STATUS_OPTIONS = [...STATUSES]
 
 /** Picks who is being considered for one calling, with a status and notes on each */
-export const CandidatesField = memo(function CandidatesField({ row, candidates, options, names, loading, membersError, dropdownTarget, onChange, onDone, size = 'xs' }: CandidatesFieldProps) {
+export const CandidatesField = memo(function CandidatesField({ row, candidates, options, names, loading, held, membersError, dropdownTarget, onChange, onPick, onUnpick, onDone, size = 'xs' }: CandidatesFieldProps) {
   const nameOf = (id: string) => candidateName(id, names, loading)
+  const callingsOf = (id: string) => held.get(id)?.map(c => c.sustained ? `${c.calling} (${tenure(c.sustained)})` : c.calling).join(', ')
 
-  // candidates who aren't in the member list (moved out, or typed in before
-  // there was one) still need an option to show as picked
+  // candidates who aren't options (moved out, typed in before there was a
+  // member list, or not meeting what the calling requires) still need an option to show as picked
   const data = useMemo(() => {
-    const unlisted = candidates.filter(c => !names.has(c.id)).map(c => ({ value: c.id, label: candidateName(c.id, names, loading) }))
+    const unlisted = candidates.filter(c => !options.some(o => o.value === c.id)).map(c => ({ value: c.id, label: candidateName(c.id, names, loading) }))
     return unlisted.length ? [...unlisted, ...options] : options
   }, [options, names, loading, candidates])
 
   const pick = (ids: string[]) => {
     onChange(row, ids.map(id => candidates.find(c => c.id === id) ?? { id, notes: '' }), false)
+    for (const id of ids) if (!candidates.some(c => c.id === id)) onPick(row, id)
+    for (const c of candidates) if (!ids.includes(c.id)) onUnpick(row, c.id)
   }
 
   const setNotes = (id: string, notes: string) => {
@@ -76,42 +99,55 @@ export const CandidatesField = memo(function CandidatesField({ row, candidates, 
         searchable
         hidePickedOptions
         limit={OPTION_LIMIT}
+        renderOption={({ option }) => {
+          const callings = callingsOf(option.value)
+          return (
+            <div>
+              <Text size={size}>{option.label}</Text>
+              {callings && <Text size="xs" c="dimmed">{callings}</Text>}
+            </div>
+          )
+        }}
         nothingFoundMessage={loading ? 'Loading members…' : membersError ? `Couldn't load members: ${membersError}` : 'No members found'}
         // with a field in every row, keeping closed dropdowns around adds up
         comboboxProps={{ keepMounted: false, portalProps: { target: dropdownTarget } }}
       />
-      {candidates.map(c => (
-        <Stack key={c.id} gap={2}>
-          <Select
-            size={size}
-            label={nameOf(c.id)}
-            aria-label={`Status of ${nameOf(c.id)} for ${row.calling}`}
-            placeholder="Status"
-            data={STATUS_OPTIONS}
-            value={c.status ?? null}
-            onChange={(value) => {
-              setStatus(c.id, value)
-            }}
-            clearable
-            comboboxProps={{ keepMounted: false, portalProps: { target: dropdownTarget } }}
-          />
-          <Textarea
-            size={size}
-            aria-label={`Notes on ${nameOf(c.id)} for ${row.calling}`}
-            placeholder="Notes"
-            autosize
-            minRows={1}
-            maxRows={6}
-            value={c.notes}
-            onChange={(event) => {
-              setNotes(c.id, event.currentTarget.value)
-            }}
-            onBlur={() => {
-              onDone(row.key)
-            }}
-          />
-        </Stack>
-      ))}
+      {candidates.map((c) => {
+        const callings = callingsOf(c.id)
+        return (
+          <Stack key={c.id} gap={2}>
+            <Select
+              size={size}
+              label={nameOf(c.id)}
+              description={callings && `Now ${callings}`}
+              aria-label={`Status of ${nameOf(c.id)} for ${row.calling}`}
+              placeholder="Status"
+              data={STATUS_OPTIONS}
+              value={c.status ?? null}
+              onChange={(value) => {
+                setStatus(c.id, value)
+              }}
+              clearable
+              comboboxProps={{ keepMounted: false, portalProps: { target: dropdownTarget } }}
+            />
+            <Textarea
+              size={size}
+              aria-label={`Notes on ${nameOf(c.id)} for ${row.calling}`}
+              placeholder="Notes"
+              autosize
+              minRows={1}
+              maxRows={6}
+              value={c.notes}
+              onChange={(event) => {
+                setNotes(c.id, event.currentTarget.value)
+              }}
+              onBlur={() => {
+                onDone(row.key)
+              }}
+            />
+          </Stack>
+        )
+      })}
     </Stack>
   )
 })
