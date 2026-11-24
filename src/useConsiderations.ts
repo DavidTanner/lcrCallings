@@ -16,13 +16,6 @@ interface PendingEdit {
 
 const NOTHING_TRACKED: Tracking = { candidates: [] }
 
-/** The callings each member holds now, by member uuid */
-export function heldCallings<T extends CallingInfo>(rows: T[]) {
-  const held = new Map<string, T[]>()
-  for (const row of rows) if (row.member) held.set(row.member, [...held.get(row.member) ?? [], row])
-  return held
-}
-
 /** Each row's Updated, by key */
 const stampsOf = (values: Record<string, Tracking>) =>
   new Map(Object.entries(values).flatMap(([key, { updated }]) => updated ? [[key, updated] as const] : []))

@@ -1,12 +1,12 @@
 import { Anchor, Button, Group, Text } from '@mantine/core'
 import mantineCss from '@mantine/core/styles.css'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { CandidatesField, candidateName, memberLabel } from './CandidatesField'
+import { CandidatesField } from './CandidatesField'
 import { HolderStatusField, type HolderStatusFieldProps, highlightColor, vacantHighlight } from './HolderStatusField'
 import { LAYER_ID } from './constants'
 import type { ExtensionApi } from './content/api'
-import { type CallingRule, callingName, optionsByCalling } from './lcr/callingRules'
+import { type CallingRule, callingName } from './lcr/callingRules'
 import type { Member } from './lcr/members'
 import { type CallingRow, enhancePage } from './page/enhance'
 import { shadowContainer } from './shadow'
@@ -14,7 +14,8 @@ import { ShareLinkButton } from './ShareLinkButton'
 import { type Candidate, type Consideration, consideration, type Tracking } from './shared/consideration'
 import { message } from './shared/errors'
 import { spreadsheetUrl } from './shared/spreadsheet'
-import { type CallingInfo, heldCallings, useConsiderations } from './useConsiderations'
+import { useConsiderations } from './useConsiderations'
+import { useMemberOptions } from './useMemberOptions'
 
 export { SAVE_DELAY_MS } from './useConsiderations'
 
@@ -72,7 +73,8 @@ export function Tracker({ doc, api, spreadsheetId, initial, webUrl, onChangeShee
   const [layer] = useState(() => createLayer(doc))
 
   const save = useCallback((consideration: Consideration) => api.save(spreadsheetId, consideration), [api, spreadsheetId])
-  const { values, change, changeHolderStatus, considerRelease, reconsiderRelease, flush, settle, replace, saving, error, setError } = useConsiderations(initial, save)
+  const considerations = useConsiderations(initial, save)
+  const { values, change, changeHolderStatus, flush, settle, replace, saving, error, setError } = considerations
 
   useEffect(() => {
     const e = enhancePage(doc, (next) => {
@@ -135,19 +137,8 @@ export function Tracker({ doc, api, spreadsheetId, initial, webUrl, onChangeShee
     }
   }, [api, spreadsheetId, setError])
 
-  const options = useMemo(() => members?.map(m => ({ value: m.uuid, label: memberLabel(m) })) ?? [], [members])
-  /** calling name → the members who can hold it */
-  const byCalling = useMemo(() => optionsByCalling(rules, members ?? [], options), [rules, members, options])
-  const names = useMemo(() => new Map(options.map(o => [o.value, o.label])), [options])
+  const { options, byCalling, names, held, pick, unpick } = useMemberOptions(members, rules, rows, considerations, doc)
   const loading = !members && !membersError
-  const held = useMemo(() => heldCallings(rows), [rows])
-  /** someone picked for another calling may be released from the ones they hold */
-  const pick = useCallback((row: CallingInfo, id: string) => {
-    considerRelease(row, held.get(id))
-  }, [held, considerRelease])
-  const unpick = useCallback((row: CallingInfo, id: string) => {
-    reconsiderRelease(row, id, candidateName(id, names, false), held.get(id), q => doc.defaultView?.confirm(q) ?? true)
-  }, [held, names, reconsiderRelease, doc])
 
   const refresh = async () => {
     setRefreshing(true)

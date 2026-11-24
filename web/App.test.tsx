@@ -289,6 +289,17 @@ describe('WebApp', () => {
     assert.ok(screen.getByText('Ward Clerk'))
   })
 
+  it('gives an organization a column for every 10 callings', async () => {
+    const auth = fakeAuth(true)
+    const callings = (organization: string, count: number) => Array.from({ length: count }, (_, i): Consideration => ({ key: `${organization} Teacher|vacant|${String(i)}`, calling: `${organization} Teacher`, member: '', organization: [organization], candidates: [] }))
+    renderApp(auth, fakeApi(auth, [...ROWS.map(row => ({ ...row, organization: ['Bishopric'] })), ...callings('Primary', 11), ...callings('Sunday School', 21)]))
+    const width = async (name: string) => (await screen.findByRole('region', { name })).style.width
+    // Mantine sizes in rem: 300px a column, with 16px between them
+    assert.match(await width('Bishopric'), /^calc\(18\.75rem /)
+    assert.match(await width('Primary'), /^calc\(38\.5rem /)
+    assert.match(await width('Sunday School'), /^calc\(58\.25rem /)
+  })
+
   it('groups callings by organization, and adds or removes organizations from view', async () => {
     const auth = fakeAuth(true)
     const rows: Consideration[] = [
@@ -299,7 +310,7 @@ describe('WebApp', () => {
     renderApp(auth, fakeApi(auth, rows))
     await screen.findByText('Bishop')
     const headings = () => screen.queryAllByRole('heading').filter(h => h.tagName === 'H2').map(h => h.textContent)
-    assert.deepEqual(screen.getAllByRole('heading').filter(h => ['H2', 'H3'].includes(h.tagName)).map(h => h.textContent), ['Bishopric', 'Elders Quorum', 'Teachers', 'Not grouped yet'])
+    assert.deepEqual(screen.getAllByRole('heading').filter(h => ['H2', 'H3'].includes(h.tagName)).map(h => h.textContent), ['Bishopric', 'Elders Quorum', 'Not grouped yet', 'Teachers'])
     assert.ok(within(screen.getByRole('region', { name: 'Bishopric' })).getByText('Ward Clerk'))
 
     await click(screen.getByRole('button', { name: 'Organizations: All organizations' }))

@@ -1,14 +1,15 @@
 import { Alert, Anchor, Badge, Button, Group, Mark, Paper, SegmentedControl, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import type { SheetMember, SheetsClient } from '../src/background/sheets'
-import { CandidatesField, candidateName, memberLabel } from '../src/CandidatesField'
-import { type CallingRule, callingName, optionsByCalling } from '../src/lcr/callingRules'
+import { CandidatesField, candidateName } from '../src/CandidatesField'
+import { type CallingRule, callingName } from '../src/lcr/callingRules'
 import { HolderStatusField, VACANT_COLOR } from '../src/HolderStatusField'
 import { ShareLinkButton } from '../src/ShareLinkButton'
 import { type Candidate, type Consideration, HOLDER_STATUS_COLORS, tracking } from '../src/shared/consideration'
 import { message } from '../src/shared/errors'
 import { spreadsheetUrl } from '../src/shared/spreadsheet'
-import { type CallingInfo, heldCallings, useConsiderations } from '../src/useConsiderations'
+import { type CallingInfo, useConsiderations } from '../src/useConsiderations'
+import { useMemberOptions } from '../src/useMemberOptions'
 import { OrganizationPicker } from './OrganizationPicker'
 import { byOrganization, UNGROUPED } from './organizations'
 
@@ -18,6 +19,15 @@ export type WebApi = Pick<SheetsClient, 'loadRows' | 'loadMembers' | 'loadRules'
 const NO_CANDIDATES: Candidate[] = []
 
 type Show = 'all' | 'considering' | 'vacant'
+
+/** How wide each organization's column is at full size, in px */
+const COLUMN_WIDTH = 300
+/** Space between columns, in px */
+const COLUMN_GAP = 16
+/** Most callings in a column; an organization with more shown gets more columns, so it isn't far longer than the rest */
+const PER_COLUMN = 10
+/** How far the board can be zoomed out, in %, to see more of it at once */
+const ZOOMS = ['100', '75', '50', '25']
 
 export interface BoardProps {
   api: WebApi
@@ -39,26 +49,19 @@ export function Board({ api, spreadsheetId, rows: initialRows, members: initialM
   const [rules, setRules] = useState(initialRules)
   const [search, setSearch] = useState('')
   const [show, setShow] = useState<Show>('all')
+  const [zoom, setZoom] = useState('100')
+  /** the column names above the board, scrolled sideways along with it */
+  const columnNames = useRef<HTMLDivElement>(null)
   /** organizations taken out of view; any not in it, including new ones, are shown */
   const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set())
   const [refreshing, setRefreshing] = useState(false)
 
   const initial = useMemo(() => Object.fromEntries(initialRows.map(r => [r.key, tracking(r)])), [initialRows])
   const save = useCallback((consideration: Consideration) => api.save(spreadsheetId, consideration), [api, spreadsheetId])
-  const { values, change, changeHolderStatus, considerRelease, reconsiderRelease, flush, settle, retry, replace, saving, unsaved, error, setError } = useConsiderations(initial, save)
+  const considerations = useConsiderations(initial, save)
+  const { values, change, changeHolderStatus, flush, settle, retry, replace, saving, unsaved, error, setError } = considerations
 
-  const options = useMemo(() => members.map(m => ({ value: m.uuid, label: memberLabel(m) })), [members])
-  /** calling name → the members who can hold it */
-  const byCalling = useMemo(() => optionsByCalling(rules, members, options), [rules, members, options])
-  const names = useMemo(() => new Map(options.map(o => [o.value, o.label])), [options])
-  const held = useMemo(() => heldCallings(callings), [callings])
-  /** someone picked for another calling may be released from the ones they hold */
-  const pick = useCallback((row: CallingInfo, id: string) => {
-    considerRelease(row, held.get(id))
-  }, [held, considerRelease])
-  const unpick = useCallback((row: CallingInfo, id: string) => {
-    reconsiderRelease(row, id, candidateName(id, names, false), held.get(id), q => window.confirm(q))
-  }, [held, names, reconsiderRelease])
+  const { options, byCalling, names, held, pick, unpick } = useMemberOptions(members, rules, callings, considerations, document)
 
   const refresh = async () => {
     setRefreshing(true)
@@ -109,6 +112,8 @@ export function Board({ api, spreadsheetId, rows: initialRows, members: initialM
     .filter(o => !hidden.has(o.name))
     .map(o => ({ ...o, groups: o.groups.map(g => ({ ...g, rows: g.rows.filter(matches) })).filter(g => g.rows.length) }))
     .filter(o => o.groups.length)
+    .map(o => ({ ...o, columns: Math.ceil(o.groups.reduce((n, g) => n + g.rows.length, 0) / PER_COLUMN) }))
+  const widthOf = (columns: number) => columns * COLUMN_WIDTH + (columns - 1) * COLUMN_GAP
 
   return (
     <Stack gap="md">
@@ -144,7 +149,8 @@ export function Board({ api, spreadsheetId, rows: initialRows, members: initialM
         </Alert>
       )}
 
-      <Stack gap="xs">
+      {/* stays at the top while scrolling down the board, so it's clear which column is which */}
+      <Stack gap="xs" pos="sticky" top={0} py="xs" bg="var(--mantine-color-body)" style={{ zIndex: 2 }}>
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xs" verticalSpacing="xs">
           <TextInput
             type="search"
@@ -158,82 +164,102 @@ export function Board({ api, spreadsheetId, rows: initialRows, members: initialM
           />
           <OrganizationPicker organizations={organizationNames} hidden={hidden} onChange={setHidden} />
         </SimpleGrid>
-        <SegmentedControl
-          fullWidth
-          value={show}
-          onChange={(value) => {
-            setShow(value)
-          }}
-          data={[
-            { value: 'all', label: 'All' },
-            { value: 'considering', label: 'Considering' },
-            { value: 'vacant', label: 'Vacant' },
-          ]}
-        />
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xs" verticalSpacing="xs">
+          <SegmentedControl
+            fullWidth
+            value={show}
+            onChange={(value) => {
+              setShow(value)
+            }}
+            data={[
+              { value: 'all', label: 'All' },
+              { value: 'considering', label: 'Considering' },
+              { value: 'vacant', label: 'Vacant' },
+            ]}
+          />
+          <SegmentedControl
+            fullWidth
+            aria-label="Zoom"
+            value={zoom}
+            onChange={setZoom}
+            data={ZOOMS.map(z => ({ value: z, label: `${z}%` }))}
+          />
+        </SimpleGrid>
+        <div ref={columnNames} style={{ overflowX: 'hidden' }}>
+          <Group align="flex-end" wrap="nowrap" gap={COLUMN_GAP} w="max-content" style={{ zoom: Number(zoom) / 100 }}>
+            {shown.map(({ name, columns }) => <Title key={name} order={2} size="h3" w={widthOf(columns)}>{name}</Title>)}
+          </Group>
+        </div>
       </Stack>
 
-      {shown.map(({ name, groups }) => (
-        <Stack key={name} component="section" gap="xs" aria-label={name}>
-          <div>
-            <Title order={2} size="h3">{name}</Title>
-            {name === UNGROUPED && (
-              <Text size="sm" c="dimmed">
-                The sheet doesn&apos;t say which organization these are in yet. Someone with the extension can press Sync all callings on LCR&apos;s Organizations page to sort them.
-              </Text>
-            )}
-          </div>
-          {groups.map(group => (
-            <Stack key={group.name} gap={6}>
-              {group.name && <Title order={3} size="h5" c="dimmed">{group.name}</Title>}
-              {/* up to six columns on a desktop, so more callings fit on screen */}
-              <SimpleGrid cols={{ base: 1, xs: 2, sm: 3, md: 4, lg: 5, xl: 6, xxl: 7 }} spacing="xs" verticalSpacing="xs" style={{ alignItems: 'start' }}>
-                {group.rows.map((row) => {
-                  const holder = holderName(row.member)
-                  const holderStatus = values[row.key]?.holderStatus
-                  return (
-                    <Paper key={row.key} withBorder radius="md" p="xs">
-                      <Stack gap={6}>
-                        <div>
-                          <Title order={4} size="h1" lh={1.3}>{row.calling}</Title>
-                          {holder
-                            ? (
-                                <Text size="lg" fw={500} c={holderStatus ? undefined : 'dimmed'} truncate>
-                                  {holderStatus ? <Mark color={HOLDER_STATUS_COLORS[holderStatus]} px={4}>{holder}</Mark> : holder}
-                                </Text>
-                              )
-                            : <Badge size="lg" variant="light" color={VACANT_COLOR}>Vacant</Badge>}
-                        </div>
-                        {holder && (
-                          <HolderStatusField
-                            row={row}
-                            holder={holder}
-                            status={holderStatus}
-                            onChange={changeHolderStatus}
-                            size="md"
-                          />
-                        )}
-                        <CandidatesField
-                          row={row}
-                          candidates={values[row.key]?.candidates ?? NO_CANDIDATES}
-                          options={byCalling.get(callingName(row.calling)) ?? options}
-                          names={names}
-                          loading={false}
-                          held={held}
-                          onChange={change}
-                          onPick={pick}
-                          onUnpick={unpick}
-                          onDone={flush}
-                          size="md"
-                        />
-                      </Stack>
-                    </Paper>
-                  )
-                })}
-              </SimpleGrid>
+      {/* like a transfer board: a column per organization, side by side, scrolling sideways; zoomed out to see more of it */}
+      <div
+        style={{ overflowX: 'auto', paddingBottom: 8 }}
+        onScroll={(event) => {
+          if (columnNames.current) columnNames.current.scrollLeft = event.currentTarget.scrollLeft
+        }}
+      >
+        <Group align="flex-start" wrap="nowrap" gap={COLUMN_GAP} w="max-content" style={{ zoom: Number(zoom) / 100 }}>
+          {shown.map(({ name, groups, columns }) => (
+            <Stack key={name} component="section" gap="xs" aria-label={name} w={widthOf(columns)}>
+              {name === UNGROUPED && (
+                <Text size="sm" c="dimmed">
+                  The sheet doesn&apos;t say which organization these are in yet. Someone with the extension can press Sync all callings on LCR&apos;s Organizations page to sort them.
+                </Text>
+              )}
+              {groups.map(group => (
+                <Stack key={group.name} gap={6}>
+                  {group.name && <Title order={3} size="h5" c="dimmed">{group.name}</Title>}
+                  <SimpleGrid cols={columns} spacing="xs" verticalSpacing="xs" style={{ alignItems: 'start' }}>
+                    {group.rows.map((row) => {
+                      const holder = holderName(row.member)
+                      const holderStatus = values[row.key]?.holderStatus
+                      return (
+                        <Paper key={row.key} withBorder radius="md" p="xs">
+                          <Stack gap={6}>
+                            <div>
+                              <Title order={4} size="h4" lh={1.3}>{row.calling}</Title>
+                              {holder
+                                ? (
+                                    <Text size="lg" fw={500} truncate>
+                                      {holderStatus ? <Mark color={HOLDER_STATUS_COLORS[holderStatus]} px={4}>{holder}</Mark> : holder}
+                                    </Text>
+                                  )
+                                : <Badge size="lg" variant="light" color={VACANT_COLOR}>Vacant</Badge>}
+                            </div>
+                            {holder && (
+                              <HolderStatusField
+                                row={row}
+                                holder={holder}
+                                status={holderStatus}
+                                onChange={changeHolderStatus}
+                                size="md"
+                              />
+                            )}
+                            <CandidatesField
+                              row={row}
+                              candidates={values[row.key]?.candidates ?? NO_CANDIDATES}
+                              options={byCalling.get(callingName(row.calling)) ?? options}
+                              names={names}
+                              loading={false}
+                              held={held}
+                              onChange={change}
+                              onPick={pick}
+                              onUnpick={unpick}
+                              onDone={flush}
+                              size="md"
+                            />
+                          </Stack>
+                        </Paper>
+                      )
+                    })}
+                  </SimpleGrid>
+                </Stack>
+              ))}
             </Stack>
           ))}
-        </Stack>
-      ))}
+        </Group>
+      </div>
       {callings.length > 0 && !shown.length && (
         <Text c="dimmed" ta="center">
           {organizationNames.every(name => hidden.has(name)) ? 'No organizations picked.' : 'Nothing matches.'}

@@ -96,7 +96,7 @@ describe('App', () => {
     }
     renderApp(api)
     await screen.findByText(/Tracking/)
-    assert.deepEqual(picked('Bishop'), ['Cole, Dee (F)'])
+    assert.deepEqual(picked('Bishop'), ['Cole, Dee'])
 
     const field = input('Bishop')
     const container = cell('Bishop')

@@ -41,6 +41,9 @@ async function send<T extends BackgroundRequest>(request: T): Promise<Background
 
 const SPREADSHEET_ID = 'spreadsheetId'
 
+/** The language LCR's page is in, to load its data in */
+const lang = () => new URLSearchParams(location.search).get('lang') ?? 'eng'
+
 export const chromeApi: ExtensionApi = {
   async getSpreadsheetId() {
     const { [SPREADSHEET_ID]: id } = await chrome.storage.sync.get(SPREADSHEET_ID)
@@ -52,8 +55,8 @@ export const chromeApi: ExtensionApi = {
   sync: (spreadsheetId, considerations) => send({ type: 'sync', spreadsheetId, considerations }),
   // LCR's session cookie only goes with requests from the page's own origin,
   // so this is fetched here rather than in the background
-  loadMembers: () => fetchMemberList(location.origin, fetch, new URLSearchParams(location.search).get('lang') ?? 'eng'),
-  loadCallingRules: () => fetchCallingRules(location.origin, fetch, new URLSearchParams(location.search).get('lang') ?? 'eng'),
+  loadMembers: () => fetchMemberList(location.origin, fetch, lang()),
+  loadCallingRules: () => fetchCallingRules(location.origin, fetch, lang()),
   saveMembers: async (spreadsheetId, members) => {
     // only what's shown or checked against callings' rules: the rest of LCR's member record stays out of the sheet
     await send({ type: 'saveMembers', spreadsheetId, members: members.map(({ uuid, name, sex, age, organizations, baptized }) => ({ uuid, name, sex, age, organizations, baptized })) })
