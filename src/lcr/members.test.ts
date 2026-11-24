@@ -69,12 +69,25 @@ describe('parseMembers, beyond the Organizations page', () => {
   it('reads the Member List page\'s members, which keep their names in nameFormats', () => {
     const member = {
       uuid: 'u4',
+      age: 41,
       sex: 'FEMALE',
       currentUnitName: 'Test Ward',
       nameFormats: { listPreferredLocal: 'Dunn, Eve', listPreferredSort: 'DUNN, EVE', spokenPreferredLocal: 'Eve Dunn' },
     }
     assert.deepEqual(parseMembers(`1:${JSON.stringify({ members: [member] })}\n`), [
-      { uuid: 'u4', name: 'Dunn, Eve', nameSort: 'DUNN, EVE', sex: 'F', currentUnitName: 'Test Ward' },
+      { uuid: 'u4', name: 'Dunn, Eve', nameSort: 'DUNN, EVE', sex: 'F', age: 41, currentUnitName: 'Test Ward' },
+    ])
+  })
+
+  it('reads what the Member List page says of organizations and baptism', () => {
+    const fields = { uuid: 'u5', nameFormats: { listPreferredLocal: 'Eads, Fay', listPreferredSort: 'EADS, FAY' }, associatedOrgUuids: ['rs'] }
+    const list = `1:${JSON.stringify({ members: [
+      { ...fields, statusFlags: { baptizedAndConfirmed: true } },
+      { ...fields, uuid: 'u6', statusFlags: {} },
+    ] })}\n`
+    assert.deepEqual(parseMembers(list).map(({ uuid, baptized, organizations }) => ({ uuid, baptized, organizations })), [
+      { uuid: 'u5', baptized: true, organizations: ['rs'] },
+      { uuid: 'u6', baptized: false, organizations: ['rs'] },
     ])
   })
 })

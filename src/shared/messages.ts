@@ -1,4 +1,5 @@
 import type { SheetMember } from '../background/sheets'
+import type { CallingRule } from '../lcr/callingRules'
 import type { Consideration, Tracking } from './consideration'
 
 /** Messages the content script sends the background service worker */
@@ -7,6 +8,7 @@ export type BackgroundRequest
     | { type: 'save', spreadsheetId: string, consideration: Consideration }
     | { type: 'sync', spreadsheetId: string, considerations: Consideration[] }
     | { type: 'saveMembers', spreadsheetId: string, members: SheetMember[] }
+    | { type: 'saveRules', spreadsheetId: string, rules: [string, CallingRule][] }
 
 export interface BackgroundResponses {
   /** key → who is being considered, and where the holder is */
@@ -16,6 +18,7 @@ export interface BackgroundResponses {
   /** how many rows were added */
   sync: number
   saveMembers: null
+  saveRules: null
 }
 
 /** `status` is Google's, when the Sheets API refused the request */

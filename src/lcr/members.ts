@@ -73,7 +73,12 @@ export interface Member {
   /** sortable form of the name */
   nameSort: string
   sex?: 'M' | 'F'
+  age?: number
   currentUnitName?: string
+  /** uuids of the organizations they belong to, from the Member List page */
+  organizations?: string[]
+  /** baptized and confirmed, from the Member List page */
+  baptized?: boolean
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -92,7 +97,7 @@ const SEXES: Partial<Record<string, 'M' | 'F'>> = { M: 'M', F: 'F', MALE: 'M', F
 /** `strict` also requires a sortable name, to tell members apart from other things with a uuid and name */
 function toMember(value: unknown, strict: boolean): Member | undefined {
   if (!isRecord(value)) return undefined
-  const { uuid, sex, currentUnitName } = value
+  const { uuid, sex, age, currentUnitName, associatedOrgUuids, statusFlags } = value
   const name = typeof value.name === 'string' ? value.name : nameFormat(value, 'listPreferredLocal')
   const nameSort = typeof value.nameSort === 'string' ? value.nameSort : nameFormat(value, 'listPreferredSort')
   if (typeof uuid !== 'string' || name === undefined) return undefined
@@ -103,7 +108,10 @@ function toMember(value: unknown, strict: boolean): Member | undefined {
     name,
     nameSort: nameSort ?? name,
     ...(sexCode ? { sex: sexCode } : {}),
+    ...(typeof age === 'number' ? { age } : {}),
     ...(typeof currentUnitName === 'string' ? { currentUnitName } : {}),
+    ...(isRecord(statusFlags) ? { baptized: statusFlags.baptizedAndConfirmed === true } : {}),
+    ...(Array.isArray(associatedOrgUuids) ? { organizations: associatedOrgUuids.filter(o => typeof o === 'string') } : {}),
   }
 }
 

@@ -24,7 +24,7 @@ if (!globalThis.callingsContentScript) {
       unmount = undefined
     }
     else {
-      unmount = mount(document, chromeApi, WEB_URL)
+      unmount = mount(document, chromeApi, WEB_URL, chrome.runtime.getManifest().name)
     }
   })
 }

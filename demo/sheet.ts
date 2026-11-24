@@ -1,4 +1,4 @@
-import { HEADER, MEMBERS_HEADER, MEMBERS_TITLE, ORGANIZATION_SEPARATOR, SHEET_TITLE } from '../src/background/sheets'
+import { HEADER, MEMBERS_HEADER, memberRow, MEMBERS_TITLE, ORGANIZATION_SEPARATOR, SHEET_TITLE } from '../src/background/sheets'
 import type { Consideration } from '../src/shared/consideration'
 import { MEMBERS, ORGANIZATIONS, rowKey, SEED_SHEET } from './data'
 
@@ -37,7 +37,7 @@ export function demoConsiderations(): Consideration[] {
 }
 
 /** A row of the Considering tab, as the extension writes it (see src/background/sheets.ts) */
-function sheetRow({ key, calling, member, organization = [], position, candidates, holderStatus }: Consideration): string[] {
+function sheetRow({ key, calling, member, organization = [], position, sustained, candidates, holderStatus }: Consideration): string[] {
   return [
     key,
     calling,
@@ -50,6 +50,7 @@ function sheetRow({ key, calling, member, organization = [], position, candidate
     organization.join(ORGANIZATION_SEPARATOR),
     position === undefined ? '' : String(position),
     holderStatus ?? '',
+    sustained ?? '',
   ]
 }
 
@@ -63,6 +64,6 @@ const csv = (rows: string[][]) => rows.map(row => row.map(csvCell).join(',')).jo
 export function demoSheetCsv(): Record<string, string> {
   return {
     [`${SHEET_TITLE}.csv`]: csv([HEADER, ...demoConsiderations().map(sheetRow)]),
-    [`${MEMBERS_TITLE}.csv`]: csv([MEMBERS_HEADER, ...MEMBERS.map(m => [m.uuid, m.name])]),
+    [`${MEMBERS_TITLE}.csv`]: csv([MEMBERS_HEADER, ...MEMBERS.map(memberRow)]),
   }
 }

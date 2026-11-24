@@ -1,4 +1,5 @@
 import { SheetsError } from '../background/sheets'
+import { type CallingRule, fetchCallingRules } from '../lcr/callingRules'
 import { fetchMemberList } from '../lcr/memberList'
 import type { Member } from '../lcr/members'
 import type { Consideration, Tracking } from '../shared/consideration'
@@ -18,7 +19,11 @@ export interface ExtensionApi {
   sync: (spreadsheetId: string, considerations: Consideration[]) => Promise<number>
   /** the unit's members, to pick candidates from */
   loadMembers: () => Promise<Member[]>
-  /** Copies members' names into the sheet, for pages away from LCR */
+  /** what each calling requires, by name, to show only members who can hold it; everyone is shown without it */
+  loadCallingRules?: () => Promise<Map<string, CallingRule>>
+  /** Copies what callings require into the sheet, for pages away from LCR */
+  saveCallingRules?: (spreadsheetId: string, rules: Map<string, CallingRule>) => Promise<void>
+  /** Copies members' names, and what's checked against callings' rules, into the sheet, for pages away from LCR */
   saveMembers: (spreadsheetId: string, members: Member[]) => Promise<void>
   /**
    * Shows Google's file picker over the page, on just `spreadsheetId` if
@@ -36,6 +41,9 @@ async function send<T extends BackgroundRequest>(request: T): Promise<Background
 
 const SPREADSHEET_ID = 'spreadsheetId'
 
+/** The language LCR's page is in, to load its data in */
+const lang = () => new URLSearchParams(location.search).get('lang') ?? 'eng'
+
 export const chromeApi: ExtensionApi = {
   async getSpreadsheetId() {
     const { [SPREADSHEET_ID]: id } = await chrome.storage.sync.get(SPREADSHEET_ID)
@@ -47,10 +55,14 @@ export const chromeApi: ExtensionApi = {
   sync: (spreadsheetId, considerations) => send({ type: 'sync', spreadsheetId, considerations }),
   // LCR's session cookie only goes with requests from the page's own origin,
   // so this is fetched here rather than in the background
-  loadMembers: () => fetchMemberList(location.origin, fetch, new URLSearchParams(location.search).get('lang') ?? 'eng'),
+  loadMembers: () => fetchMemberList(location.origin, fetch, lang()),
+  loadCallingRules: () => fetchCallingRules(location.origin, fetch, lang()),
   saveMembers: async (spreadsheetId, members) => {
-    // only the id and name: the rest of LCR's member record stays out of the sheet
-    await send({ type: 'saveMembers', spreadsheetId, members: members.map(({ uuid, name }) => ({ uuid, name })) })
+    // only what's shown or checked against callings' rules: the rest of LCR's member record stays out of the sheet
+    await send({ type: 'saveMembers', spreadsheetId, members: members.map(({ uuid, name, sex, age, organizations, baptized }) => ({ uuid, name, sex, age, organizations, baptized })) })
+  },
+  saveCallingRules: async (spreadsheetId, rules) => {
+    await send({ type: 'saveRules', spreadsheetId, rules: [...rules] })
   },
   pickSheet: spreadsheetId => showPicker(document, chrome.runtime.getURL(PICKER_FRAME), spreadsheetId),
 }

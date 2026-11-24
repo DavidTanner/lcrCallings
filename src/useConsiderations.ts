@@ -116,6 +116,23 @@ export function useConsiderations(initial: Record<string, Tracking>, save: (cons
     edit(calling, ({ candidates }) => ({ candidates, ...(holderStatus ? { holderStatus } : {}) }), false)
   }, [edit])
 
+  /** Someone picked for `row` may be released from the callings they hold: marks them considering release, unless a status is already picked */
+  const considerRelease = useCallback((row: CallingInfo, held: CallingInfo[] = []) => {
+    for (const calling of held) if (calling.key !== row.key && !latest.current[calling.key]?.holderStatus) changeHolderStatus(calling, 'Considering Release')
+  }, [changeHolderStatus])
+
+  /**
+   * Member `id` (named `name`), no longer considered for `row`, stops being considered for release from the callings they hold, unless
+   * `confirm` says to keep it. Not asked while they're still considered for another calling.
+   */
+  const reconsiderRelease = useCallback((row: CallingInfo, id: string, name: string, held: CallingInfo[] = [], confirm: (question: string) => boolean) => {
+    if (Object.entries(latest.current).some(([key, { candidates }]) => key !== row.key && candidates.some(c => c.id === id))) return
+    const releasing = held.filter(c => c.key !== row.key && latest.current[c.key]?.holderStatus === 'Considering Release')
+    if (!releasing.length) return
+    if (confirm(`${name} is no longer being considered for ${row.calling}. Still consider them for release as ${releasing.map(c => c.calling).join(', ')}?`)) return
+    for (const calling of releasing) changeHolderStatus(calling, undefined)
+  }, [changeHolderStatus])
+
   /** Saves every pending edit now, and waits for all saves to finish */
   const settle = useCallback(async () => {
     for (const key of [...pending.current.keys()]) flush(key)
@@ -158,5 +175,5 @@ export function useConsiderations(initial: Record<string, Tracking>, save: (cons
     }
   }, [flush])
 
-  return { values, change, changeHolderStatus, flush, settle, retry, replace, saving, unsaved, error, setError }
+  return { values, change, changeHolderStatus, considerRelease, reconsiderRelease, flush, settle, retry, replace, saving, unsaved, error, setError }
 }

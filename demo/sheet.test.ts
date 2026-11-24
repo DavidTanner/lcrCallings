@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { describe, it } from 'node:test'
-import { HEADER, MEMBERS_HEADER, placementIn, trackingIn } from '../src/background/sheets'
+import { HEADER, MEMBERS_HEADER, memberRow, placementIn, trackingIn } from '../src/background/sheets'
 import { enhancePage } from '../src/page/enhance'
 import type { Consideration } from '../src/shared/consideration'
 import { MEMBERS, ORGANIZATIONS, SEED_SHEET } from './data'
@@ -61,7 +61,7 @@ describe('demo sheet', () => {
 
     const [membersHeader, ...members] = parseCsv(files['Members.csv'] ?? '')
     assert.deepEqual(membersHeader, MEMBERS_HEADER)
-    assert.deepEqual(members, MEMBERS.map(m => [m.uuid, m.name]))
+    assert.deepEqual(members, MEMBERS.map(memberRow))
   })
 
   it('is what demo/sheet/ holds', async () => {

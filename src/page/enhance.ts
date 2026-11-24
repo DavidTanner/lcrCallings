@@ -27,6 +27,8 @@ export interface CallingRow {
   organization: string[]
   /** where the row is on the page, from 0 */
   position: number
+  /** when the holder was sustained, as YYYY-MM-DD */
+  sustained?: string
   /** element in the added cell to render the row's field into */
   slot: HTMLElement
   /** the page's Name cell, which shows whoever holds the calling now */
@@ -41,6 +43,17 @@ export function slugify(text: string): string {
 
 const label = (cell: Element) => cell.querySelector(`:scope > .${LABEL_CLASS}`)?.textContent.trim()
 const cellLabelled = (row: Element, name: string) => [...row.children].find(cell => label(cell) === name)
+
+/**
+ * A date as the page shows it, e.g. "7 Jan 2024", as YYYY-MM-DD.
+ * shortcut: only English month names parse, so other languages' pages get none; parse them if needed.
+ */
+export function isoDate(text: string): string | undefined {
+  const date = new Date(text)
+  if (!text || Number.isNaN(date.getTime())) return undefined
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${String(date.getFullYear())}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
 
 /** A cell cloned from `template` (so it matches the page's styling) with the given label */
 function addedCell(template: Element, tag: 'td' | 'th', title: string) {
@@ -145,6 +158,10 @@ export function enhancePage(doc: Document, onApply?: (rows: CallingRow[]) => voi
         // kept up to date on the same object, in case rows are added above it
         row.organization = organizations.get(tr.closest('table') ?? tr) ?? []
         row.position = found.length
+        const sustainedCell = cellLabelled(tr, 'Sustained')
+        const sustained = sustainedCell && isoDate(sustainedCell.textContent.replace(label(sustainedCell) ?? '', '').trim())
+        if (sustained) row.sustained = sustained
+        else delete row.sustained
         found.push(row)
       }
     }

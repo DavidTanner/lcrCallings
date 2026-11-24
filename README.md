@@ -37,11 +37,20 @@ https://lcrcallings.click/disclaimer/.
 
 Members come from LCR's Member List page (`/mlt/records/member-list`),
 fetched with your LCR session. Each time the panel opens, the extension also
-copies each member's id and name (nothing else) into a `Members` tab in the
-sheet, for the [web page](#web-page).
+copies into a `Members` tab in the sheet, for the [web page](#web-page), each
+member's id, name, sex and age, the ids of the organizations they belong to, and
+whether they're baptized and confirmed (nothing else):
+`Id | Name | Sex | Age | Organizations | Baptized`.
+
+Each calling's dropdown lists only members who can hold it, by what LCR's
+Organizations page (`/mlt/orgs`) says it requires: sex, minimum age, being
+baptized and confirmed, and belonging to its organization. The extension copies
+that into a `Rules` tab, `Calling | Sex | Minimum age | Members only | Organizations`,
+so the web page lists the same members. Callings without a rule, and anyone
+already picked, are always listed; if the rules can't be loaded, everyone is.
 
 The extension keeps its rows in a `Considering` tab it adds to the sheet:
-`Key | Calling | Held by | Considering | Updated | Notes | Data | Status | Organization | Position | Holder status`. Members are
+`Key | Calling | Held by | Considering | Updated | Notes | Data | Status | Organization | Position | Holder status | Sustained`. Members are
 recorded by their LCR member id (uuid), never by name, since members can share
 a name: Held by is the current holder's id, Considering lists each candidate's
 id, Notes are `<id>: <notes>`, Status is `<id>: <status>`, and Data (JSON) is

@@ -1,9 +1,10 @@
 import { MantineProvider } from '@mantine/core'
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import assert from 'node:assert/strict'
 import { afterEach, describe, it } from 'node:test'
 import { type SheetMember, SheetsError } from '../src/background/sheets'
 import { fakeClipboard } from '../test/clipboard'
+import type { CallingRule } from '../src/lcr/callingRules'
 import type { Consideration } from '../src/shared/consideration'
 import { WebApp } from './App'
 import type { WebApi } from './Board'
@@ -46,7 +47,7 @@ function fakeAuth(signedIn: boolean) {
 }
 
 /** A pretend sheet that needs `auth` to be signed in, and the app to have been given access to it unless `blocked` */
-function fakeApi(auth: GoogleAuth, rows = ROWS, members = MEMBERS) {
+function fakeApi(auth: GoogleAuth, rows = ROWS, members = MEMBERS, rules = new Map<string, CallingRule>()) {
   const saved: Consideration[] = []
   const signedIn = () => {
     if (!auth.isSignedIn()) return Promise.reject(new SignInRequired())
@@ -63,6 +64,10 @@ function fakeApi(auth: GoogleAuth, rows = ROWS, members = MEMBERS) {
     loadMembers: async () => {
       await signedIn()
       return members
+    },
+    loadRules: async () => {
+      await signedIn()
+      return rules
     },
     save: async (_id, consideration) => {
       await signedIn()
@@ -175,6 +180,85 @@ describe('WebApp', () => {
     assert.ok(await screen.findByText(/All changes saved/))
   })
 
+  it('lists only members who can hold the calling, from the Rules tab', async () => {
+    const auth = fakeAuth(true)
+    const members: SheetMember[] = [{ uuid: 'm1', name: 'Abel, Bea', sex: 'F' }, { uuid: 'm2', name: 'Baker, Cal', sex: 'M' }]
+    renderApp(auth, fakeApi(auth, ROWS, members, new Map([['Bishop', { sex: 'M' }]])))
+    fireEvent.click(await screen.findByLabelText<HTMLInputElement>('Considering for Bishop'))
+    await waitFor(() => {
+      assert.deepEqual(screen.queryAllByRole('option').map(o => o.textContent), ['Baker, Cal (M)'])
+    })
+  })
+
+  it('shows the callings members hold, and marks them considering release once picked for another', async () => {
+    const auth = fakeAuth(true)
+    const api = fakeApi(auth)
+    renderApp(auth, api)
+    const field = await screen.findByLabelText<HTMLInputElement>('Considering for Ward Clerk')
+    fireEvent.click(field)
+    fireEvent.change(field, { target: { value: 'Pra' } })
+    await click(await screen.findByRole('option', { name: /Pratt, Orson\s*Bishop/ }))
+    assert.deepEqual(api.saved, [
+      { key: 'Ward Clerk|vacant|0', calling: 'Ward Clerk', member: '', candidates: [{ id: 'm1', notes: 'Good with numbers', status: 'Pray about' }, { id: 'p1', notes: '' }] },
+      { key: 'Bishop|p1|0', calling: 'Bishop', member: 'p1', candidates: [], holderStatus: 'Considering Release' },
+    ])
+    assert.ok(screen.getByText('Now Bishop'))
+  })
+
+  it('doesn\'t ask about release while a member taken out is still considered for another calling', async () => {
+    const auth = fakeAuth(true)
+    const rows: Consideration[] = [
+      { key: 'Bishop|p1|0', calling: 'Bishop', member: 'p1', candidates: [], holderStatus: 'Considering Release' },
+      { key: 'Ward Clerk|vacant|0', calling: 'Ward Clerk', member: '', candidates: [{ id: 'p1', notes: '' }] },
+      { key: 'Organist|vacant|0', calling: 'Organist', member: '', candidates: [{ id: 'p1', notes: '' }] },
+    ]
+    const api = fakeApi(auth, rows)
+    let asked = 0
+    Object.assign(window, { confirm: () => ++asked > 0 })
+    try {
+      renderApp(auth, api)
+      const field = await screen.findByLabelText<HTMLInputElement>('Considering for Ward Clerk')
+      fireEvent.keyDown(field, { key: 'Backspace' })
+      await act(async () => {})
+    }
+    finally {
+      Reflect.deleteProperty(window, 'confirm')
+    }
+    assert.equal(asked, 0)
+    assert.deepEqual(api.saved, [{ key: 'Ward Clerk|vacant|0', calling: 'Ward Clerk', member: '', candidates: [] }])
+  })
+
+  for (const keep of [true, false]) {
+    it(`asks whether a member taken out is still considered for release, ${keep ? 'keeping' : 'clearing'} it`, async () => {
+      const auth = fakeAuth(true)
+      const rows: Consideration[] = [
+        { key: 'Bishop|p1|0', calling: 'Bishop', member: 'p1', candidates: [], holderStatus: 'Considering Release' },
+        { key: 'Ward Clerk|vacant|0', calling: 'Ward Clerk', member: '', candidates: [{ id: 'p1', notes: '' }] },
+      ]
+      const api = fakeApi(auth, rows)
+      const asked: string[] = []
+      const confirm = (question?: string) => {
+        asked.push(String(question))
+        return keep
+      }
+      Object.assign(window, { confirm })
+      try {
+        renderApp(auth, api)
+        const field = await screen.findByLabelText<HTMLInputElement>('Considering for Ward Clerk')
+        fireEvent.keyDown(field, { key: 'Backspace' })
+        await act(async () => {})
+      }
+      finally {
+        Reflect.deleteProperty(window, 'confirm')
+      }
+      assert.deepEqual(asked, ['Pratt, Orson is no longer being considered for Ward Clerk. Still consider them for release as Bishop?'])
+      assert.deepEqual(api.saved, [
+        { key: 'Ward Clerk|vacant|0', calling: 'Ward Clerk', member: '', candidates: [] },
+        ...keep ? [] : [{ key: 'Bishop|p1|0', calling: 'Bishop', member: 'p1', candidates: [] }],
+      ])
+    })
+  }
+
   it('saves the holder\'s status, highlighting their name', async () => {
     const auth = fakeAuth(true)
     const api = fakeApi(auth)
@@ -205,6 +289,17 @@ describe('WebApp', () => {
     assert.ok(screen.getByText('Ward Clerk'))
   })
 
+  it('gives an organization a column for every 10 callings', async () => {
+    const auth = fakeAuth(true)
+    const callings = (organization: string, count: number) => Array.from({ length: count }, (_, i): Consideration => ({ key: `${organization} Teacher|vacant|${String(i)}`, calling: `${organization} Teacher`, member: '', organization: [organization], candidates: [] }))
+    renderApp(auth, fakeApi(auth, [...ROWS.map(row => ({ ...row, organization: ['Bishopric'] })), ...callings('Primary', 11), ...callings('Sunday School', 21)]))
+    const width = async (name: string) => (await screen.findByRole('region', { name })).style.width
+    // Mantine sizes in rem: 300px a column, with 16px between them
+    assert.match(await width('Bishopric'), /^calc\(18\.75rem /)
+    assert.match(await width('Primary'), /^calc\(38\.5rem /)
+    assert.match(await width('Sunday School'), /^calc\(58\.25rem /)
+  })
+
   it('groups callings by organization, and adds or removes organizations from view', async () => {
     const auth = fakeAuth(true)
     const rows: Consideration[] = [
@@ -215,7 +310,7 @@ describe('WebApp', () => {
     renderApp(auth, fakeApi(auth, rows))
     await screen.findByText('Bishop')
     const headings = () => screen.queryAllByRole('heading').filter(h => h.tagName === 'H2').map(h => h.textContent)
-    assert.deepEqual(screen.getAllByRole('heading').filter(h => ['H2', 'H3'].includes(h.tagName)).map(h => h.textContent), ['Bishopric', 'Elders Quorum', 'Teachers', 'Not grouped yet'])
+    assert.deepEqual(screen.getAllByRole('heading').filter(h => ['H2', 'H3'].includes(h.tagName)).map(h => h.textContent), ['Bishopric', 'Elders Quorum', 'Not grouped yet', 'Teachers'])
     assert.ok(within(screen.getByRole('region', { name: 'Bishopric' })).getByText('Ward Clerk'))
 
     await click(screen.getByRole('button', { name: 'Organizations: All organizations' }))

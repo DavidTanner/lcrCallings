@@ -1,6 +1,7 @@
 import { Alert, Anchor, Button, Container, Group, Loader, Stack, Text, Title } from '@mantine/core'
 import { type ReactNode, useCallback, useEffect, useState } from 'react'
 import { needsAccess, type SheetMember } from '../src/background/sheets'
+import type { CallingRule } from '../src/lcr/callingRules'
 import { APP_NAME } from '../src/constants'
 import { message } from '../src/shared/errors'
 import type { Consideration } from '../src/shared/consideration'
@@ -27,7 +28,7 @@ type State
   = | { step: 'signIn', error?: string }
     | { step: 'loading' }
     | { step: 'needsAccess', error?: string }
-    | { step: 'ready', rows: Consideration[], members: SheetMember[] }
+    | { step: 'ready', rows: Consideration[], members: SheetMember[], rules: Map<string, CallingRule> }
     | { step: 'failed', error: string }
 
 /** The page for people who can't install the extension: the sheet's callings, editable */
@@ -38,8 +39,8 @@ export function WebApp({ auth, api, spreadsheetId: initialId, onSpreadsheetId, p
   /** What to show once the sheet is read */
   const readSheet = useCallback(async (id: string): Promise<State> => {
     try {
-      const [rows, members] = await Promise.all([api.loadRows(id), api.loadMembers(id)])
-      return { step: 'ready', rows, members }
+      const [rows, members, rules] = await Promise.all([api.loadRows(id), api.loadMembers(id), api.loadRules(id)])
+      return { step: 'ready', rows, members, rules }
     }
     catch (error) {
       if (error instanceof SignInRequired) return { step: 'signIn' }
@@ -157,7 +158,7 @@ export function WebApp({ auth, api, spreadsheetId: initialId, onSpreadsheetId, p
         )
         break
       case 'ready':
-        body = <Board api={api} spreadsheetId={spreadsheetId} rows={state.rows} members={state.members} pageUrl={pageUrl} ensureSignedIn={ensureSignedIn} />
+        body = <Board api={api} spreadsheetId={spreadsheetId} rows={state.rows} members={state.members} rules={state.rules} pageUrl={pageUrl} ensureSignedIn={ensureSignedIn} />
         break
     }
   }
