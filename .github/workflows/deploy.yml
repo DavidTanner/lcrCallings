@@ -45,6 +45,9 @@ jobs:
         with:
           name: github-pages-${{ github.run_attempt }}
           path: public
+      # shortcut: a fixed wait for the upload to become visible to deploy-pages
+      # (46s is the worst reported), remove when actions/deploy-pages#451 is fixed.
+      - run: sleep 60
       - id: deploy
         uses: actions/deploy-pages@v5
         with:
