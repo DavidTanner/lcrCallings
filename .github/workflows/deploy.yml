@@ -39,11 +39,16 @@ jobs:
           SPREADSHEET_ID: ${{ vars.SPREADSHEET_ID }}
           CWS_EXTENSION_ID: ${{ vars.CWS_EXTENSION_ID }}
       - uses: actions/configure-pages@v6
+      # Artifacts outlive a failed attempt, and deploy-pages rejects two with the
+      # same name, so each attempt gets its own or re-runs could never deploy.
       - uses: actions/upload-pages-artifact@v5
         with:
+          name: github-pages-${{ github.run_attempt }}
           path: public
       - id: deploy
         uses: actions/deploy-pages@v5
+        with:
+          artifact_name: github-pages-${{ github.run_attempt }}
 
   # Publishes the extension to the Chrome Web Store when package.json's version
   # hasn't been released yet, so bumping the version releases it. Tags the
